@@ -2,46 +2,30 @@ import { Notyf } from "notyf";
 import "notyf/notyf.min.css";
 
 const notyf = new Notyf({
-  duration:  3500,
-  position:  { x: "right", y: "bottom" },
-  ripple:    true,
+  duration: 3500,
+  position: { x: "right", y: "bottom" },
+  ripple: false,
   dismissible: true,
   types: [
     {
       type:       "success",
       background: "#FF6200",
-      icon: {
-        className: "bx bx-check-circle",
-        tagName:   "i",
-        color:     "#fff",
-      },
+      icon:       false,
     },
     {
       type:       "error",
       background: "#dc2626",
-      icon: {
-        className: "bx bx-x-circle",
-        tagName:   "i",
-        color:     "#fff",
-      },
+      icon:       false,
     },
     {
       type:       "warning",
       background: "#d97706",
-      icon: {
-        className: "bx bx-error",
-        tagName:   "i",
-        color:     "#fff",
-      },
+      icon:       false,
     },
     {
       type:       "info",
       background: "#2563eb",
-      icon: {
-        className: "bx bx-info-circle",
-        tagName:   "i",
-        color:     "#fff",
-      },
+      icon:       false,
     },
   ],
 });
