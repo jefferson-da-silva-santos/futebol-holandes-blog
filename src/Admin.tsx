@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNotyf } from "./useNotyf";
 import {
-  authApi, articlesApi, categoriesApi, normalizeArticle, auth, AuthError,
+  authApi, articlesApi, categoriesApi, normalizeArticle, auth,
   type Article, type Category, type ArticleInput, type AdminUser,
 } from "./api";
 
