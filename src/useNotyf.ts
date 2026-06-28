@@ -1,10 +1,6 @@
-// ─────────────────────────────────────────────────────────────────────────────
-//  useNotyf.ts — Singleton Notyf para uso em todo o projeto
-// ─────────────────────────────────────────────────────────────────────────────
 import { Notyf } from "notyf";
 import "notyf/notyf.min.css";
 
-// Instância única compartilhada (singleton)
 const notyf = new Notyf({
   duration:  3500,
   position:  { x: "right", y: "bottom" },

@@ -1691,3 +1691,196 @@ ul, ol  { list-style: none; }
 }
 .adm-modal-title i { font-size: 1.2rem; color: var(--orange); }
 .cp-form { display: flex; flex-direction: column; gap: 0.85rem; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NOTYF OVERRIDES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.notyf {
+  z-index: 99999 !important;
+}
+
+.notyf__toast {
+  border-radius: 10px !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.22) !important;
+  font-family: 'Inter', system-ui, sans-serif !important;
+  font-size: 0.85rem !important;
+  font-weight: 600 !important;
+  min-width: 260px !important;
+  max-width: 360px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+.notyf__toast--success { background: #FF6200 !important; }
+.notyf__toast--error   { background: #dc2626 !important; }
+
+/* Remove o ícone SVG padrão do Notyf e usa o nosso */
+.notyf__icon {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: rgba(0,0,0,0.15) !important;
+  border-radius: 0 !important;
+  width: 48px !important;
+  min-width: 48px !important;
+  height: 100% !important;
+  min-height: 52px !important;
+  position: relative !important;
+}
+
+/* Esconde o SVG animado interno */
+.notyf__icon svg,
+.notyf__icon--success svg,
+.notyf__icon--error svg { display: none !important; }
+
+/* Mostra o ícone Boxicons */
+.notyf__icon i {
+  font-size: 1.3rem !important;
+  color: #fff !important;
+  display: block !important;
+}
+
+.notyf__wrapper {
+  display: flex !important;
+  align-items: center !important;
+  padding: 0 !important;
+  gap: 0 !important;
+  min-height: 52px !important;
+}
+
+.notyf__message {
+  color: #fff !important;
+  font-weight: 600 !important;
+  padding: 0.75rem 1rem !important;
+  flex: 1 !important;
+  line-height: 1.4 !important;
+}
+
+.notyf__ripple { display: none !important; }
+
+.notyf__dismiss {
+  background: rgba(0,0,0,0.15) !important;
+  border-left: 1px solid rgba(255,255,255,0.15) !important;
+  border-radius: 0 !important;
+  width: 36px !important;
+  min-width: 36px !important;
+  height: 100% !important;
+  min-height: 52px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: background 0.15s !important;
+}
+.notyf__dismiss:hover { background: rgba(0,0,0,0.25) !important; }
+.notyf__dismiss-btn {
+  width: 14px !important;
+  height: 14px !important;
+}
+.notyf__dismiss-btn::after,
+.notyf__dismiss-btn::before {
+  background: rgba(255,255,255,0.85) !important;
+  width: 14px !important;
+}
+
+/* ── Icon Picker ──────────────────────────────────────────────────────────── */
+.icon-picker {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.4rem;
+  padding: 0.5rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  max-height: 200px;
+  overflow-y: auto;
+}
+.icon-pick-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.5rem 0.25rem;
+  border-radius: var(--r-sm);
+  border: 1.5px solid transparent;
+  background: var(--surface);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  color: var(--txt3);
+}
+.icon-pick-btn i {
+  font-size: 1.3rem;
+  line-height: 1;
+}
+.icon-pick-btn span {
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-align: center;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.icon-pick-btn:hover {
+  background: var(--orange-light);
+  color: var(--orange);
+  border-color: rgba(255,98,0,0.2);
+}
+.icon-pick-active {
+  background: var(--orange-light) !important;
+  border-color: var(--orange) !important;
+  color: var(--orange) !important;
+}
+
+/* ── Category Manager ─────────────────────────────────────────────────────── */
+.cat-manager-body {
+  padding: 1.5rem;
+}
+.cat-new-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 1rem 1.1rem;
+}
+.cat-new-form .adm-field { min-width: 140px; }
+.cat-new-form .adm-field:first-child { flex: 1; min-width: 180px; }
+.cat-new-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.cat-new-btn {
+  align-self: flex-end;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.cat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.cat-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 0.7rem 1rem;
+  box-shadow: var(--shadow-s);
+  transition: border-color 0.15s;
+}
+.cat-row:hover { border-color: rgba(255,98,0,0.25); }
+.cat-row-count {
+  flex: 1;
+  font-size: 0.75rem;
+  color: var(--txt3);
+  font-weight: 500;
+}
