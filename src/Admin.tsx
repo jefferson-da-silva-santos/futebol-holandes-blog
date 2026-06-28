@@ -3,9 +3,7 @@ import { useNotyf } from "./useNotyf";
 import {
   authApi, articlesApi, categoriesApi, standingsApi, convocationApi,
   fixturesApi, nationsApi, scorersApi, configApi, normalizeArticle, auth,
-  type Article, type Category, type ArticleInput, type AdminUser,
-  type Standing, type StandingEntry, type Convocation, type Fixture,
-  type NationsGroup, type NationsEntry, type TopScorer, type SiteConfig,
+  type Article, type Category, type ArticleInput, type AdminUser, type StandingEntry, type Fixture, type NationsEntry, type SiteConfig,
 } from "./api";
 
 const ICONS: { cls: string; label: string }[] = [
@@ -307,7 +305,6 @@ function ArticleRow({ article, onEdit, onDelete, onToggle, onFeature }: {
 
 // ─── Classificação ────────────────────────────────────────────────────────────
 function StandingsSection({ notyf }: { notyf: ReturnType<typeof useNotyf> }) {
-  const [standing, setStanding] = useState<Standing|null>(null);
   const [loading,  setLoading]  = useState(true);
   const [saving,   setSaving]   = useState(false);
   const [title,    setTitle]    = useState("");
@@ -316,7 +313,6 @@ function StandingsSection({ notyf }: { notyf: ReturnType<typeof useNotyf> }) {
 
   useEffect(()=>{
     standingsApi.get().then(s=>{
-      setStanding(s);
       if(s){ setTitle(s.title); setFooter(s.footer); setEntries(s.entries.map(({id,...e})=>e)); }
     }).catch(()=>notyf.error("Erro ao carregar classificação.")).finally(()=>setLoading(false));
   },[]);
@@ -332,8 +328,7 @@ function StandingsSection({ notyf }: { notyf: ReturnType<typeof useNotyf> }) {
   async function handleSave(){
     setSaving(true);
     try{
-      const updated=await standingsApi.update({title,footer,entries:entries.map((e,i)=>({...e,position:i+1}))});
-      setStanding(updated);
+      await standingsApi.update({title,footer,entries:entries.map((e,i)=>({...e,position:i+1}))});
       notyf.success("Classificação salva!");
     }catch(err:any){ notyf.error(err.message); }
     finally{ setSaving(false); }
@@ -830,7 +825,7 @@ function AdminPanel({ user, onLogout, onExit }: { user:AdminUser; onLogout:()=>v
     {key:"config",      icon:"bx-cog",             label:"Config. do Site"},
   ];
 
-  const specialViews: AdminView[] = ["categories","standings","convocation","fixtures","nations","scorers","config"];
+  // const specialViews: AdminView[] = ["categories","standings","convocation","fixtures","nations","scorers","config"];
 
   return (
     <div className="adm-root">
