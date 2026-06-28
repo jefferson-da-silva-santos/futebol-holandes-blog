@@ -1696,7 +1696,7 @@ ul, ol  { list-style: none; }
    NOTYF OVERRIDES
    ═══════════════════════════════════════════════════════════════════════════ */
 
-.notyf { z-index: 99999 !important; }
+/* .notyf { z-index: 99999 !important; }
 .notyf__toast--success { background: #FF6200 !important; }
 .notyf__toast--error   { background: #dc2626 !important; }
 .notyf__toast--warning { background: #d97706 !important; }
@@ -1711,7 +1711,7 @@ ul, ol  { list-style: none; }
 .notyf__icon   { display: none !important; }
 .notyf__ripple { display: none !important; }
 .notyf__dismiss { display: none !important; }
-.notyf__message { color: #fff !important; font-weight: 600 !important; }
+.notyf__message { color: #fff !important; font-weight: 600 !important; } */
 
 
 /* ── Icon Picker ──────────────────────────────────────────────────────────── */
