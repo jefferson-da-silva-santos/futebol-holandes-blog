@@ -100,7 +100,8 @@ ul, ol  { list-style: none; }
 .logo-text {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  align-items: flex-start;
+  gap: 4px;
   line-height: 1;
 }
 .logo-title {
