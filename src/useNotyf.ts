@@ -5,7 +5,7 @@ const notyf = new Notyf({
   duration: 3500,
   position: { x: "right", y: "bottom" },
   ripple: false,
-  dismissible: true,
+  dismissible: false,
   types: [
     {
       type:       "success",
