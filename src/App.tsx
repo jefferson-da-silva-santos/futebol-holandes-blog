@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, createContext, useContext, type ReactNode } from "react";
+import { Routes, Route, Link, NavLink, useNavigate, useParams, Outlet } from "react-router-dom";
 import {
   articlesApi, standingsApi, convocationApi, fixturesApi, nationsApi,
   scorersApi, configApi, normalizeArticle,
@@ -8,7 +9,69 @@ import {
 import { useNotyf } from "./useNotyf";
 import Admin from "./Admin";
 
-// ─── Widgets ──────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+//  DATA CONTEXT — carrega tudo uma vez e compartilha entre as páginas
+// ═════════════════════════════════════════════════════════════════════════════
+interface DataContextValue {
+  articles: Article[];
+  standing: Standing | null;
+  nations: NationsGroup | null;
+  scorers: TopScorer[];
+  convocation: Convocation | null;
+  fixtures: Fixture[];
+  config: SiteConfig;
+  loading: boolean;
+  reload: () => Promise<void>;
+}
+const DataContext = createContext<DataContextValue | null>(null);
+
+function DataProvider({ children }: { children: ReactNode }) {
+  const [articles,    setArticles]    = useState<Article[]>([]);
+  const [standing,    setStanding]    = useState<Standing | null>(null);
+  const [nations,     setNations]     = useState<NationsGroup | null>(null);
+  const [scorers,     setScorers]     = useState<TopScorer[]>([]);
+  const [convocation, setConvocation] = useState<Convocation | null>(null);
+  const [fixtures,    setFixtures]    = useState<Fixture[]>([]);
+  const [config,      setConfig]      = useState<SiteConfig>({});
+  const [loading,     setLoading]     = useState(true);
+  const notyf = useNotyf();
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [artRes, st, nat, sc, conv, fix, cfg] = await Promise.all([
+        articlesApi.list({ published: true, limit: 50 }),
+        standingsApi.get(), nationsApi.get(), scorersApi.list(),
+        convocationApi.get(), fixturesApi.list(), configApi.get(),
+      ]);
+      setArticles(artRes.articles.map(normalizeArticle));
+      setStanding(st); setNations(nat); setScorers(sc);
+      setConvocation(conv); setFixtures(fix); setConfig(cfg);
+    } catch {
+      notyf.error("Erro ao carregar dados. Verifique a conexão com a API.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { reload(); }, [reload]);
+
+  return (
+    <DataContext.Provider value={{ articles, standing, nations, scorers, convocation, fixtures, config, loading, reload }}>
+      {children}
+    </DataContext.Provider>
+  );
+}
+
+function useSiteData() {
+  const ctx = useContext(DataContext);
+  if (!ctx) throw new Error("useSiteData deve ser usado dentro de <DataProvider>");
+  return ctx;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  WIDGETS
+// ═════════════════════════════════════════════════════════════════════════════
 function StandingsWidget({ standing }: { standing: Standing | null }) {
   if (!standing) return null;
   return (
@@ -78,7 +141,6 @@ function ScorersWidget({ scorers }: { scorers: TopScorer[] }) {
   );
 }
 
-// ─── Article Card ─────────────────────────────────────────────────────────────
 function ArticleCard({article,onClick}:{article:Article;onClick:()=>void}) {
   return (
     <article className="news-card" onClick={onClick} role="button" tabIndex={0} onKeyDown={e=>e.key==="Enter"&&onClick()}>
@@ -101,7 +163,7 @@ function HeroCard({article,size,onClick}:{article:Article;size:"large"|"small";o
       <img src={article.image} alt={article.title} className="hero-img"/>
       <div className="hero-overlay"/>
       <div className="hero-body">
-        <span className={`badge ${article.category.badgeClass}`}>{article.category.name}</span>
+        <span className={`badge ${article.category.badgeClass}`} style={{background: article.category.color}}>{article.category.name}</span>
         {size==="large"
           ?<h2 className="hero-title">{article.title}</h2>
           :<h3 className="hero-sub-title">{article.title}</h3>}
@@ -111,7 +173,6 @@ function HeroCard({article,size,onClick}:{article:Article;size:"large"|"small";o
   );
 }
 
-// ─── Skeleton ─────────────────────────────────────────────────────────────────
 function PageSkeleton() {
   return (
     <div className="layout-grid">
@@ -132,70 +193,19 @@ function PageSkeleton() {
   );
 }
 
-// ─── Article Page ─────────────────────────────────────────────────────────────
-function ArticlePage({ article, articles, standing, nations, onBack, onOpen }: {
-  article: Article; articles: Article[]; standing: Standing|null; nations: NationsGroup|null;
-  onBack: ()=>void; onOpen: (a:Article)=>void;
-}) {
-  useEffect(()=>{window.scrollTo({top:0,behavior:"smooth"});},[]);
-  const related = articles.filter(a=>a.id!==article.id&&a.category.id===article.category.id).slice(0,2);
-  const readTime = Math.max(1, Math.ceil(article.body.join(" ").split(" ").length/200));
-  return (
-    <div className="article-layout">
-      <main className="main">
-        <nav className="breadcrumb">
-          <button className="bread-link" onClick={onBack}><i className="bx bx-home-alt"/> Início</button>
-          <i className="bx bx-chevron-right bread-sep"/>
-          <span className="bread-current">{article.category.name}</span>
-        </nav>
-        <div className="art-hero-img">
-          <img src={article.image} alt={article.title}/>
-          <div className="art-hero-gradient"/>
-        </div>
-        <article className="art-card">
-          <header className="art-header">
-            <div className="art-badges">
-              <span className={`badge ${article.category.badgeClass}`}>{article.category.name}</span>
-              {article.club&&<span className="badge badge-grey">{article.club}</span>}
-            </div>
-            <h1 className="art-title">{article.title}</h1>
-            <div className="art-meta-row">
-              <span className="art-meta-item"><i className="bx bx-calendar"/> {article.date}</span>
-              <span className="art-meta-item"><i className="bx bx-time-five"/> {readTime} min de leitura</span>
-            </div>
-          </header>
-          <div className="art-body">{article.body.map((p,i)=><p key={i}>{p}</p>)}</div>
-          <footer className="art-footer">
-            <div className="art-tags">
-              {article.tags.map(t=><span key={t} className="art-tag"><i className="bx bx-hash"/>{t}</span>)}
-            </div>
-            <button className="back-btn" onClick={onBack}><i className="bx bx-arrow-back"/> Voltar</button>
-          </footer>
-        </article>
-        {related.length>0&&(
-          <section className="related-section">
-            <div className="sec-head"><span className="sec-label"><i className="bx bx-news"/> Relacionadas</span></div>
-            <div className={`news-grid cols-${related.length}`}>
-              {related.map(n=><ArticleCard key={n.id} article={n} onClick={()=>onOpen(n)}/>)}
-            </div>
-          </section>
-        )}
-      </main>
-      <aside className="sidebar">
-        <StandingsWidget standing={standing}/>
-        <NationsWidget nations={nations}/>
-      </aside>
-    </div>
-  );
-}
+// ═════════════════════════════════════════════════════════════════════════════
+//  PÁGINAS
+// ═════════════════════════════════════════════════════════════════════════════
+function HomePage() {
+  const { articles, standing, nations, loading } = useSiteData();
+  const navigate = useNavigate();
+  if (loading) return <PageSkeleton/>;
 
-// ─── Pages ────────────────────────────────────────────────────────────────────
-function HomePage({ articles, standing, nations, onOpen }: {
-  articles: Article[]; standing: Standing|null; nations: NationsGroup|null; onOpen:(a:Article)=>void;
-}) {
   const published  = articles.filter(a=>a.published);
   const highlights = published.slice(0,3);
   const moreNews   = published.slice(3,6);
+  const openArticle = (slug:string) => navigate(`/noticia/${slug}`);
+
   return (
     <div className="layout-grid">
       <main className="main">
@@ -203,10 +213,10 @@ function HomePage({ articles, standing, nations, onOpen }: {
           <div className="sec-head"><span className="sec-label"><i className="bx bxs-star"/> Destaques</span></div>
           {highlights.length>0?(
             <div className="hero-grid">
-              <HeroCard article={highlights[0]} size="large" onClick={()=>onOpen(highlights[0])}/>
+              <HeroCard article={highlights[0]} size="large" onClick={()=>openArticle(highlights[0].slug)}/>
               {highlights.length>1&&(
                 <div className="hero-sub">
-                  {highlights.slice(1).map(h=><HeroCard key={h.id} article={h} size="small" onClick={()=>onOpen(h)}/>)}
+                  {highlights.slice(1).map(h=><HeroCard key={h.id} article={h} size="small" onClick={()=>openArticle(h.slug)}/>)}
                 </div>
               )}
             </div>
@@ -217,7 +227,7 @@ function HomePage({ articles, standing, nations, onOpen }: {
         {moreNews.length>0&&(
           <section className="page-section">
             <div className="sec-head"><span className="sec-label"><i className="bx bx-news"/> Mais Notícias</span></div>
-            <div className="news-grid">{moreNews.map(n=><ArticleCard key={n.id} article={n} onClick={()=>onOpen(n)}/>)}</div>
+            <div className="news-grid">{moreNews.map(n=><ArticleCard key={n.id} article={n} onClick={()=>openArticle(n.slug)}/>)}</div>
           </section>
         )}
       </main>
@@ -229,10 +239,14 @@ function HomePage({ articles, standing, nations, onOpen }: {
   );
 }
 
-function EredivisieePage({ articles, standing, config, onOpen }: {
-  articles: Article[]; standing: Standing|null; config: SiteConfig; onOpen:(a:Article)=>void;
-}) {
+function EredivisieePage() {
+  const { articles, standing, config, loading } = useSiteData();
+  const navigate = useNavigate();
+  if (loading) return <PageSkeleton/>;
+
   const news = articles.filter(a=>a.category.name==="Eredivisie"&&a.published);
+  const openArticle = (slug:string) => navigate(`/noticia/${slug}`);
+
   return (
     <div className="layout-grid">
       <main className="main">
@@ -245,7 +259,7 @@ function EredivisieePage({ articles, standing, config, onOpen }: {
         <section className="page-section">
           <div className="sec-head"><span className="sec-label"><i className="bx bx-news"/> Notícias</span></div>
           {news.length>0
-            ?<div className="news-grid">{news.map(n=><ArticleCard key={n.id} article={n} onClick={()=>onOpen(n)}/>)}</div>
+            ?<div className="news-grid">{news.map(n=><ArticleCard key={n.id} article={n} onClick={()=>openArticle(n.slug)}/>)}</div>
             :<div className="empty-state"><i className="bx bx-news"/><p>Nenhuma notícia da Eredivisie.</p></div>}
         </section>
         {standing && (
@@ -280,17 +294,20 @@ function EredivisieePage({ articles, standing, config, onOpen }: {
   );
 }
 
-function SelecaoPage({ articles, nations, scorers, convocation, fixtures, onOpen }: {
-  articles: Article[]; nations: NationsGroup|null; scorers: TopScorer[];
-  convocation: Convocation|null; fixtures: Fixture[]; onOpen:(a:Article)=>void;
-}) {
+function SelecaoPage() {
+  const { articles, nations, scorers, convocation, fixtures, loading } = useSiteData();
+  const navigate = useNavigate();
+  if (loading) return <PageSkeleton/>;
+
   const news = articles.filter(a=>a.category.name==="Seleção Holandesa"&&a.published);
+  const openArticle = (slug:string) => navigate(`/noticia/${slug}`);
+
   return (
     <div className="layout-grid">
       <main className="main">
         <section className="page-section">
           <div className="sec-head"><span className="sec-label"><i className="bx bx-flag"/> Seleção Holandesa</span></div>
-          {news.map(n=><HeroCard key={n.id} article={n} size="large" onClick={()=>onOpen(n)}/>)}
+          {news.map(n=><HeroCard key={n.id} article={n} size="large" onClick={()=>openArticle(n.slug)}/>)}
         </section>
 
         {convocation && convocation.groups.length > 0 && (
@@ -337,95 +354,123 @@ function SelecaoPage({ articles, nations, scorers, convocation, fixtures, onOpen
   );
 }
 
-// ─── Root App ─────────────────────────────────────────────────────────────────
-type Page = "home"|"eredivisie"|"selecao";
+function ArticlePage() {
+  const { slug } = useParams<{ slug: string }>();
+  const { articles, standing, nations, loading } = useSiteData();
+  const navigate = useNavigate();
+  const article = articles.find(a => a.slug === slug);
 
-export default function App() {
-  const [articles,    setArticles]    = useState<Article[]>([]);
-  const [standing,    setStanding]    = useState<Standing|null>(null);
-  const [nations,     setNations]     = useState<NationsGroup|null>(null);
-  const [scorers,     setScorers]     = useState<TopScorer[]>([]);
-  const [convocation, setConvocation] = useState<Convocation|null>(null);
-  const [fixtures,    setFixtures]    = useState<Fixture[]>([]);
-  const [config,      setConfig]      = useState<SiteConfig>({});
-  const [loading,     setLoading]     = useState(true);
-  const [page,        setPage]        = useState<Page>("home");
-  const [article,     setArticle]     = useState<Article|null>(null);
-  const [menuOpen,    setMenuOpen]    = useState(false);
-  const [ereOpen,     setEreOpen]     = useState(false);
-  const [adminMode,   setAdminMode]   = useState(false);
+  useEffect(()=>{ window.scrollTo({top:0,behavior:"smooth"}); },[slug]);
+
+  if (loading) return <PageSkeleton/>;
+
+  if (!article) {
+    return (
+      <div className="layout-grid">
+        <main className="main">
+          <div className="empty-state">
+            <i className="bx bx-error-circle"/>
+            <p>Artigo não encontrado.</p>
+            <button className="back-btn" onClick={()=>navigate("/")}><i className="bx bx-arrow-back"/> Voltar ao início</button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  const related = articles.filter(a=>a.id!==article.id&&a.category.id===article.category.id).slice(0,2);
+  const readTime = Math.max(1, Math.ceil(article.body.join(" ").split(" ").length/200));
+
+  return (
+    <div className="article-layout">
+      <main className="main">
+        <nav className="breadcrumb">
+          <button className="bread-link" onClick={()=>navigate("/")}><i className="bx bx-home-alt"/> Início</button>
+          <i className="bx bx-chevron-right bread-sep"/>
+          <span className="bread-current">{article.category.name}</span>
+        </nav>
+        <div className="art-hero-img">
+          <img src={article.image} alt={article.title}/>
+          <div className="art-hero-gradient"/>
+        </div>
+        <article className="art-card">
+          <header className="art-header">
+            <div className="art-badges">
+              <span className={`badge ${article.category.badgeClass}`} style={{background: article.category.color}}>{article.category.name}</span>
+              {article.club&&<span className="badge badge-grey">{article.club}</span>}
+            </div>
+            <h1 className="art-title">{article.title}</h1>
+            <div className="art-meta-row">
+              <span className="art-meta-item"><i className="bx bx-calendar"/> {article.date}</span>
+              <span className="art-meta-item"><i className="bx bx-time-five"/> {readTime} min de leitura</span>
+            </div>
+          </header>
+          <div className="art-body">{article.body.map((p,i)=><p key={i}>{p}</p>)}</div>
+          <footer className="art-footer">
+            <div className="art-tags">
+              {article.tags.map(t=><span key={t} className="art-tag"><i className="bx bx-hash"/>{t}</span>)}
+            </div>
+            <button className="back-btn" onClick={()=>navigate(-1)}><i className="bx bx-arrow-back"/> Voltar</button>
+          </footer>
+        </article>
+        {related.length>0&&(
+          <section className="related-section">
+            <div className="sec-head"><span className="sec-label"><i className="bx bx-news"/> Relacionadas</span></div>
+            <div className={`news-grid cols-${related.length}`}>
+              {related.map(n=><ArticleCard key={n.id} article={n} onClick={()=>navigate(`/noticia/${n.slug}`)}/>)}
+            </div>
+          </section>
+        )}
+      </main>
+      <aside className="sidebar">
+        <StandingsWidget standing={standing}/>
+        <NationsWidget nations={nations}/>
+      </aside>
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  LAYOUT (topbar + navbar + footer compartilhados)
+// ═════════════════════════════════════════════════════════════════════════════
+function Layout() {
+  const { config } = useSiteData();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [ereOpen,  setEreOpen]  = useState(false);
   const navRef = useRef<HTMLDivElement>(null);
-  const notyf  = useNotyf();
+  const navigate = useNavigate();
 
   const today = new Intl.DateTimeFormat("pt-BR",{weekday:"long",day:"numeric",month:"long",year:"numeric"}).format(new Date());
 
-  const loadAll = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [artRes, st, nat, sc, conv, fix, cfg] = await Promise.all([
-        articlesApi.list({ published: true, limit: 50 }),
-        standingsApi.get(),
-        nationsApi.get(),
-        scorersApi.list(),
-        convocationApi.get(),
-        fixturesApi.list(),
-        configApi.get(),
-      ]);
-      setArticles(artRes.articles.map(normalizeArticle));
-      setStanding(st);
-      setNations(nat);
-      setScorers(sc);
-      setConvocation(conv);
-      setFixtures(fix);
-      setConfig(cfg);
-    } catch {
-      notyf.error("Erro ao carregar dados. Verifique a conexão com a API.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(()=>{ loadAll(); },[loadAll]);
-
   useEffect(()=>{
     function handler(e: MouseEvent) {
-      if (navRef.current && !navRef.current.contains(e.target as Node)) {
-        setEreOpen(false); setMenuOpen(false);
-      }
+      if (navRef.current && !navRef.current.contains(e.target as Node)) { setEreOpen(false); setMenuOpen(false); }
     }
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   },[]);
 
-  function nav(p: Page) {
-    setPage(p); setArticle(null); setMenuOpen(false); setEreOpen(false);
-    window.scrollTo({top:0,behavior:"smooth"});
-  }
-  function openArticle(a: Article) { setArticle(a); window.scrollTo({top:0,behavior:"smooth"}); }
-  function closeArticle() { setArticle(null); window.scrollTo({top:0,behavior:"smooth"}); }
-  function exitAdmin() { loadAll(); setAdminMode(false); }
+  const siteName   = config.site_name    || "Futebol Holandês";
+  const siteSub    = config.site_sub     || "tudo sobre o futebol da Holanda";
+  const footerTag  = config.site_tagline || "Tudo sobre o futebol da Holanda em português";
+  const footerCopy = config.footer_copy  || "© 2026 Futebol Holandês · Todos os direitos reservados";
 
-  const siteName    = config.site_name    || "Futebol Holandês";
-  const siteSub     = config.site_sub     || "tudo sobre o futebol da Holanda";
-  const footerTag   = config.site_tagline || "Tudo sobre o futebol da Holanda em português";
-  const footerCopy  = config.footer_copy  || "© 2026 Futebol Holandês · Todos os direitos reservados";
-
-  if (adminMode) return <Admin onExit={exitAdmin}/>;
+  function closeMenus(){ setMenuOpen(false); setEreOpen(false); }
 
   return (
     <div className="app">
       <div className="topbar">
         <div className="topbar-inner">
-          <button className="logo-btn" onClick={()=>nav("home")}>
+          <Link to="/" className="logo-btn" onClick={closeMenus}>
             <img src="logo.png" alt={siteName} className="logo-img"/>
             <div className="logo-text">
               <span className="logo-title">{siteName}</span>
               <span className="logo-sub">{siteSub}</span>
             </div>
-          </button>
+          </Link>
           <div className="topbar-right">
             <span className="topbar-date"><i className="bx bx-calendar"/> {today}</span>
-            <button className="adm-trigger-btn" onClick={()=>setAdminMode(true)} title="Painel Admin">
+            <button className="adm-trigger-btn" onClick={()=>navigate("/admin")} title="Painel Admin">
               <i className="bx bxs-dashboard"/>
             </button>
           </div>
@@ -435,25 +480,25 @@ export default function App() {
       <nav className="navbar" ref={navRef}>
         <div className="nav-inner">
           <div className="nav-links">
-            <button className={`nav-btn${page==="home"&&!article?" nav-active":""}`} onClick={()=>nav("home")}>
+            <NavLink to="/" end className={({isActive})=>`nav-btn${isActive?" nav-active":""}`} onClick={closeMenus}>
               <i className="bx bx-home-alt"/> Todas
-            </button>
+            </NavLink>
             <div className="nav-dropdown">
-              <button className={`nav-btn${page==="eredivisie"&&!article?" nav-active":""}`} onClick={()=>setEreOpen(o=>!o)}>
+              <button className="nav-btn" onClick={()=>setEreOpen(o=>!o)}>
                 <i className="bx bxs-trophy"/> Eredivisie
                 <i className={`bx ${ereOpen?"bx-chevron-up":"bx-chevron-down"} chevron-icon`}/>
               </button>
               {ereOpen&&(
                 <div className="dropdown">
-                  <button onClick={()=>nav("eredivisie")}><i className="bx bx-bar-chart-alt-2"/> Classificação</button>
-                  <button onClick={()=>nav("eredivisie")}><i className="bx bx-football"/> Resultados</button>
-                  <button onClick={()=>nav("eredivisie")}><i className="bx bx-news"/> Notícias</button>
+                  <Link to="/eredivisie" onClick={closeMenus}><i className="bx bx-bar-chart-alt-2"/> Classificação</Link>
+                  <Link to="/eredivisie" onClick={closeMenus}><i className="bx bx-football"/> Resultados</Link>
+                  <Link to="/eredivisie" onClick={closeMenus}><i className="bx bx-news"/> Notícias</Link>
                 </div>
               )}
             </div>
-            <button className={`nav-btn${page==="selecao"&&!article?" nav-active":""}`} onClick={()=>nav("selecao")}>
+            <NavLink to="/selecao-holandesa" className={({isActive})=>`nav-btn${isActive?" nav-active":""}`} onClick={closeMenus}>
               <i className="bx bx-flag"/> Seleção Holandesa
-            </button>
+            </NavLink>
           </div>
           <button className="hamburger" onClick={()=>{setMenuOpen(o=>!o);setEreOpen(false);}} aria-label="Menu">
             <i className={`bx ${menuOpen?"bx-x":"bx-menu"}`}/>
@@ -461,21 +506,16 @@ export default function App() {
         </div>
         {menuOpen&&(
           <div className="mobile-drawer">
-            <button className={`mob-link${page==="home"?" mob-active":""}`} onClick={()=>nav("home")}><i className="bx bx-home-alt"/> Todas</button>
-            <button className={`mob-link${page==="eredivisie"?" mob-active":""}`} onClick={()=>nav("eredivisie")}><i className="bx bxs-trophy"/> Eredivisie</button>
-            <button className={`mob-link${page==="selecao"?" mob-active":""}`} onClick={()=>nav("selecao")}><i className="bx bx-flag"/> Seleção Holandesa</button>
-            <button className="mob-link" onClick={()=>setAdminMode(true)}><i className="bx bxs-dashboard"/> Painel Admin</button>
+            <NavLink to="/" end className={({isActive})=>`mob-link${isActive?" mob-active":""}`} onClick={closeMenus}><i className="bx bx-home-alt"/> Todas</NavLink>
+            <NavLink to="/eredivisie" className={({isActive})=>`mob-link${isActive?" mob-active":""}`} onClick={closeMenus}><i className="bx bxs-trophy"/> Eredivisie</NavLink>
+            <NavLink to="/selecao-holandesa" className={({isActive})=>`mob-link${isActive?" mob-active":""}`} onClick={closeMenus}><i className="bx bx-flag"/> Seleção Holandesa</NavLink>
+            <button className="mob-link" onClick={()=>{closeMenus();navigate("/admin");}}><i className="bx bxs-dashboard"/> Painel Admin</button>
           </div>
         )}
       </nav>
 
       <div className="container">
-        {loading ? <PageSkeleton/> : article
-          ? <ArticlePage article={article} articles={articles} standing={standing} nations={nations} onBack={closeArticle} onOpen={openArticle}/>
-          : page==="home"       ? <HomePage articles={articles} standing={standing} nations={nations} onOpen={openArticle}/>
-          : page==="eredivisie" ? <EredivisieePage articles={articles} standing={standing} config={config} onOpen={openArticle}/>
-          : <SelecaoPage articles={articles} nations={nations} scorers={scorers} convocation={convocation} fixtures={fixtures} onOpen={openArticle}/>
-        }
+        <Outlet/>
       </div>
 
       <footer className="footer">
@@ -487,5 +527,25 @@ export default function App() {
         </div>
       </footer>
     </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  ROOT APP — Rotas em português
+// ═════════════════════════════════════════════════════════════════════════════
+export default function App() {
+  return (
+    <DataProvider>
+      <Routes>
+        <Route path="/admin/*" element={<Admin/>}/>
+        <Route element={<Layout/>}>
+          <Route path="/" element={<HomePage/>}/>
+          <Route path="/eredivisie" element={<EredivisieePage/>}/>
+          <Route path="/selecao-holandesa" element={<SelecaoPage/>}/>
+          <Route path="/noticia/:slug" element={<ArticlePage/>}/>
+          <Route path="*" element={<HomePage/>}/>
+        </Route>
+      </Routes>
+    </DataProvider>
   );
 }

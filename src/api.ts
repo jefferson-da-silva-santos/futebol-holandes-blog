@@ -26,7 +26,7 @@ export class AuthError extends Error {}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface AdminUser { id: number; name: string; email: string; lastLoginAt?: string; }
-export interface Category  { id: number; name: string; badgeClass: string; _count?: { articles: number }; }
+export interface Category  { id: number; name: string; badgeClass: string; color: string; _count?: { articles: number }; }
 export interface Article {
   id: number; title: string; slug: string; meta: string; date: string;
   image: string; icon: string; club?: string | null; tags: string[]; body: string[];
@@ -120,9 +120,14 @@ export const articlesApi = {
 
 // ─── Categories API ───────────────────────────────────────────────────────────
 export const categoriesApi = {
-  list()                                   { return request<Category[]>("/categories"); },
-  create(name: string, badgeClass: string) { return request<Category>("/categories", { method: "POST", body: JSON.stringify({ name, badgeClass }) }); },
-  delete(id: number)                       { return request<{ deleted: boolean }>(`/categories/${id}`, { method: "DELETE" }); },
+  list() { return request<Category[]>("/categories"); },
+  create(name: string, badgeClass: string, color: string = "#FF6200") {
+    return request<Category>("/categories", { method: "POST", body: JSON.stringify({ name, badgeClass, color }) });
+  },
+  update(id: number, data: Partial<{ name: string; badgeClass: string; color: string }>) {
+    return request<Category>(`/categories/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+  },
+  delete(id: number) { return request<{ deleted: boolean }>(`/categories/${id}`, { method: "DELETE" }); },
 };
 
 // ─── Standings API ────────────────────────────────────────────────────────────

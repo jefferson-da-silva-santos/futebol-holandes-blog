@@ -1,9 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { useNotyf } from "./useNotyf";
+import { useLocalStorage } from "./hooks/useLocalStorage";
+import ColorPicker from "./components/ColorPicker";
 import {
   authApi, articlesApi, categoriesApi, standingsApi, convocationApi,
   fixturesApi, nationsApi, scorersApi, configApi, normalizeArticle, auth,
-  type Article, type Category, type ArticleInput, type AdminUser, type StandingEntry, type Fixture, type NationsEntry, type SiteConfig,
+  type Article, type Category, type ArticleInput, type AdminUser,
+  type Standing, type StandingEntry, type Convocation, type Fixture,
+  type NationsGroup, type NationsEntry, type TopScorer, type SiteConfig,
 } from "./api";
 
 const ICONS: { cls: string; label: string }[] = [
@@ -85,6 +90,7 @@ function LoginScreen({ onLogin }: { onLogin:(u:AdminUser)=>void }) {
             {loading?<><i className="bx bx-loader-alt bx-spin"/> Entrando...</>:<><i className="bx bx-log-in"/> Entrar</>}
           </button>
         </form>
+        <p className="login-hint"><i className="bx bx-info-circle"/> Primeiro acesso? Use <code>POST /setup</code> para criar o admin.</p>
       </div>
     </div>
   );
@@ -276,7 +282,7 @@ function ArticleRow({ article, onEdit, onDelete, onToggle, onFeature }: {
       </div>
       <div className="adm-row-info">
         <div className="adm-row-meta">
-          <span className={`badge ${article.category.badgeClass}`}>{article.category.name}</span>
+          <span className={`badge ${article.category.badgeClass}`} style={{background: article.category.color}}>{article.category.name}</span>
           {article.club&&<span className="badge badge-grey">{article.club}</span>}
           {!article.published&&<span className="badge adm-badge-draft">Rascunho</span>}
           <span className="adm-row-date"><i className="bx bx-calendar"/> {article.date}</span>
@@ -304,6 +310,7 @@ function ArticleRow({ article, onEdit, onDelete, onToggle, onFeature }: {
 
 // ─── Classificação ────────────────────────────────────────────────────────────
 function StandingsSection({ notyf }: { notyf: ReturnType<typeof useNotyf> }) {
+  const [standing, setStanding] = useState<Standing|null>(null);
   const [loading,  setLoading]  = useState(true);
   const [saving,   setSaving]   = useState(false);
   const [title,    setTitle]    = useState("");
@@ -312,6 +319,7 @@ function StandingsSection({ notyf }: { notyf: ReturnType<typeof useNotyf> }) {
 
   useEffect(()=>{
     standingsApi.get().then(s=>{
+      setStanding(s);
       if(s){ setTitle(s.title); setFooter(s.footer); setEntries(s.entries.map(({id,...e})=>e)); }
     }).catch(()=>notyf.error("Erro ao carregar classificação.")).finally(()=>setLoading(false));
   },[]);
@@ -327,7 +335,8 @@ function StandingsSection({ notyf }: { notyf: ReturnType<typeof useNotyf> }) {
   async function handleSave(){
     setSaving(true);
     try{
-      await standingsApi.update({title,footer,entries:entries.map((e,i)=>({...e,position:i+1}))});
+      const updated=await standingsApi.update({title,footer,entries:entries.map((e,i)=>({...e,position:i+1}))});
+      setStanding(updated);
       notyf.success("Classificação salva!");
     }catch(err:any){ notyf.error(err.message); }
     finally{ setSaving(false); }
@@ -690,14 +699,15 @@ function CategoriesSection({ articles, categories, setCategories, notyf }: {
   notyf: ReturnType<typeof useNotyf>;
 }) {
   const [newName,setNewName]=useState("");
-  const [newBadge,setNewBadge]=useState("badge-orange");
+  const [newColor,setNewColor]=useState("#FF6200");
   const [saving,setSaving]=useState(false);
   const [deletingId,setDeletingId]=useState<number|null>(null);
+  const [editingColorId,setEditingColorId]=useState<number|null>(null);
 
   async function handleCreate(){
     if(!newName.trim()){notyf.error("Nome obrigatório.");return;}
     setSaving(true);
-    try{ const c=await categoriesApi.create(newName.trim(),newBadge); setCategories(p=>[...p,c]); setNewName(""); notyf.success(`Categoria "${c.name}" criada!`); }
+    try{ const c=await categoriesApi.create(newName.trim(),"badge-orange",newColor); setCategories(p=>[...p,c]); setNewName(""); setNewColor("#FF6200"); notyf.success(`Categoria "${c.name}" criada!`); }
     catch(err:any){notyf.error(err.message);}
     finally{setSaving(false);}
   }
@@ -707,6 +717,11 @@ function CategoriesSection({ articles, categories, setCategories, notyf }: {
     try{ await categoriesApi.delete(id); setCategories(p=>p.filter(c=>c.id!==id)); notyf.success(`"${name}" excluída.`); }
     catch(err:any){notyf.error(err.message);}
     finally{setDeletingId(null);}
+  }
+  async function handleColorChange(id:number, color:string){
+    setCategories(p=>p.map(c=>c.id===id?{...c,color}:c)); // otimista
+    try{ await categoriesApi.update(id,{color}); notyf.success("Cor atualizada!"); }
+    catch(err:any){ notyf.error(err.message); }
   }
 
   return (
@@ -718,13 +733,8 @@ function CategoriesSection({ articles, categories, setCategories, notyf }: {
         <p className="adm-sidebar-label" style={{marginBottom:"0.75rem"}}>Nova categoria</p>
         <div className="cat-new-form">
           <div className="adm-field" style={{flex:1}}><label>Nome</label><input value={newName} onChange={e=>setNewName(e.target.value)} placeholder="Ex: Champions League" onKeyDown={e=>e.key==="Enter"&&handleCreate()}/></div>
-          <div className="adm-field"><label>Cor</label>
-            <select value={newBadge} onChange={e=>setNewBadge(e.target.value)}>
-              <option value="badge-orange">🟠 Laranja</option>
-              <option value="badge-blue">🔵 Azul</option>
-            </select>
-          </div>
-          <div className="adm-field cat-new-preview"><label>Preview</label><span className={`badge ${newBadge}`}>{newName||"Categoria"}</span></div>
+          <ColorPicker label="Cor" value={newColor} onChange={setNewColor}/>
+          <div className="adm-field cat-new-preview"><label>Preview</label><span className="badge" style={{background:newColor}}>{newName||"Categoria"}</span></div>
           <button className="adm-btn adm-btn-primary cat-new-btn" onClick={handleCreate} disabled={saving}>
             {saving?<i className="bx bx-loader-alt bx-spin"/>:<><i className="bx bx-plus"/> Criar</>}
           </button>
@@ -733,8 +743,14 @@ function CategoriesSection({ articles, categories, setCategories, notyf }: {
         <div className="cat-list">
           {categories.map(c=>(
             <div key={c.id} className="cat-row">
-              <span className={`badge ${c.badgeClass}`}>{c.name}</span>
+              <span className="badge" style={{background:c.color||"#FF6200"}}>{c.name}</span>
               <span className="cat-row-count">{articles.filter(a=>a.category.id===c.id).length} artigo(s)</span>
+              <button className="adm-action-btn" onClick={()=>setEditingColorId(editingColorId===c.id?null:c.id)} title="Editar cor">
+                <i className="bx bx-palette"/>
+              </button>
+              {editingColorId===c.id && (
+                <ColorPicker value={c.color||"#FF6200"} onChange={(color)=>handleColorChange(c.id,color)}/>
+              )}
               <button className="adm-action-btn del" onClick={()=>handleDelete(c.id,c.name)} disabled={deletingId===c.id}>
                 {deletingId===c.id?<i className="bx bx-loader-alt bx-spin"/>:<i className="bx bx-trash"/>}
               </button>
@@ -754,14 +770,14 @@ type AdminView = "list"|"create"|"edit"|"categories"|"standings"|"convocation"|"
 function AdminPanel({ user, onLogout, onExit }: { user:AdminUser; onLogout:()=>void; onExit:()=>void }) {
   const [articles,   setArticles]   = useState<Article[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [view,       setView]       = useState<AdminView>("list");
+  const [view,       setView]       = useLocalStorage<AdminView>("fh_admin_last_view","list");
   const [editing,    setEditing]    = useState<Article|null>(null);
   const [loading,    setLoading]    = useState(true);
   const [saving,     setSaving]     = useState(false);
   const [confirm,    setConfirm]    = useState<{msg:string;action:()=>Promise<void>}|null>(null);
   const [confirmLoading,setConfirmLoading]=useState(false);
-  const [search,     setSearch]     = useState("");
-  const [filterCat,  setFilterCat]  = useState("Todas");
+  const [search,     setSearch]     = useLocalStorage("fh_admin_last_search","");
+  const [filterCat,  setFilterCat]  = useLocalStorage("fh_admin_last_filter","Todas");
   const [showCP,     setShowCP]     = useState(false);
   const [userMenu,   setUserMenu]   = useState(false);
 
@@ -824,7 +840,7 @@ function AdminPanel({ user, onLogout, onExit }: { user:AdminUser; onLogout:()=>v
     {key:"config",      icon:"bx-cog",             label:"Config. do Site"},
   ];
 
-  // const specialViews: AdminView[] = ["categories","standings","convocation","fixtures","nations","scorers","config"];
+  const specialViews: AdminView[] = ["categories","standings","convocation","fixtures","nations","scorers","config"];
 
   return (
     <div className="adm-root">
@@ -939,7 +955,8 @@ function AdminPanel({ user, onLogout, onExit }: { user:AdminUser; onLogout:()=>v
 }
 
 // ─── Root Admin ───────────────────────────────────────────────────────────────
-export default function Admin({ onExit }: { onExit:()=>void }) {
+export default function Admin() {
+  const navigate = useNavigate();
   const [user,setUser]=useState<AdminUser|null>(null);
   const [checking,setChecking]=useState(true);
 
@@ -950,5 +967,5 @@ export default function Admin({ onExit }: { onExit:()=>void }) {
 
   if(checking) return <div className="login-root"><div className="adm-loading"><i className="bx bx-loader-alt bx-spin adm-loading-icon"/><p>Verificando sessão...</p></div></div>;
   if(!user) return <LoginScreen onLogin={u=>setUser(u)}/>;
-  return <AdminPanel user={user} onLogout={()=>{authApi.logout();setUser(null);}} onExit={onExit}/>;
+  return <AdminPanel user={user} onLogout={()=>{authApi.logout();setUser(null);}} onExit={()=>navigate("/")}/>;
 }
