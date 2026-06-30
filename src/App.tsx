@@ -2,9 +2,9 @@ import { useState, useEffect, useRef, useCallback, createContext, useContext, ty
 import { Routes, Route, Link, NavLink, useNavigate, useParams, Outlet } from "react-router-dom";
 import {
   articlesApi, standingsApi, convocationApi, fixturesApi, nationsApi,
-  scorersApi, configApi, normalizeArticle,
+  scorersApi, configApi, menuApi, normalizeArticle,
   type Article, type Standing, type Convocation, type Fixture,
-  type NationsGroup, type TopScorer, type SiteConfig,
+  type NationsGroup, type TopScorer, type SiteConfig, type MenuItem,
 } from "./api";
 import { useNotyf } from "./useNotyf";
 import Admin from "./Admin";
@@ -20,6 +20,7 @@ interface DataContextValue {
   convocation: Convocation | null;
   fixtures: Fixture[];
   config: SiteConfig;
+  menu: MenuItem[];
   loading: boolean;
   reload: () => Promise<void>;
 }
@@ -33,20 +34,21 @@ function DataProvider({ children }: { children: ReactNode }) {
   const [convocation, setConvocation] = useState<Convocation | null>(null);
   const [fixtures,    setFixtures]    = useState<Fixture[]>([]);
   const [config,      setConfig]      = useState<SiteConfig>({});
+  const [menu,        setMenu]        = useState<MenuItem[]>([]);
   const [loading,     setLoading]     = useState(true);
   const notyf = useNotyf();
 
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const [artRes, st, nat, sc, conv, fix, cfg] = await Promise.all([
+      const [artRes, st, nat, sc, conv, fix, cfg, mnu] = await Promise.all([
         articlesApi.list({ published: true, limit: 50 }),
         standingsApi.get(), nationsApi.get(), scorersApi.list(),
-        convocationApi.get(), fixturesApi.list(), configApi.get(),
+        convocationApi.get(), fixturesApi.list(), configApi.get(), menuApi.get(),
       ]);
       setArticles(artRes.articles.map(normalizeArticle));
       setStanding(st); setNations(nat); setScorers(sc);
-      setConvocation(conv); setFixtures(fix); setConfig(cfg);
+      setConvocation(conv); setFixtures(fix); setConfig(cfg); setMenu(mnu);
     } catch {
       notyf.error("Erro ao carregar dados. Verifique a conexão com a API.");
     } finally {
@@ -57,7 +59,7 @@ function DataProvider({ children }: { children: ReactNode }) {
   useEffect(() => { reload(); }, [reload]);
 
   return (
-    <DataContext.Provider value={{ articles, standing, nations, scorers, convocation, fixtures, config, loading, reload }}>
+    <DataContext.Provider value={{ articles, standing, nations, scorers, convocation, fixtures, config, menu, loading, reload }}>
       {children}
     </DataContext.Provider>
   );
@@ -434,9 +436,9 @@ function ArticlePage() {
 //  LAYOUT (topbar + navbar + footer compartilhados)
 // ═════════════════════════════════════════════════════════════════════════════
 function Layout() {
-  const { config } = useSiteData();
+  const { config, menu } = useSiteData();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [ereOpen,  setEreOpen]  = useState(false);
+  const [openDropdownId, setOpenDropdownId] = useState<number | null>(null);
   const navRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
@@ -444,7 +446,7 @@ function Layout() {
 
   useEffect(()=>{
     function handler(e: MouseEvent) {
-      if (navRef.current && !navRef.current.contains(e.target as Node)) { setEreOpen(false); setMenuOpen(false); }
+      if (navRef.current && !navRef.current.contains(e.target as Node)) { setOpenDropdownId(null); setMenuOpen(false); }
     }
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -455,7 +457,8 @@ function Layout() {
   const footerTag  = config.site_tagline || "Tudo sobre o futebol da Holanda em português";
   const footerCopy = config.footer_copy  || "© 2026 Futebol Holandês · Todos os direitos reservados";
 
-  function closeMenus(){ setMenuOpen(false); setEreOpen(false); }
+  function closeMenus(){ setMenuOpen(false); setOpenDropdownId(null); }
+  function isExternal(path: string){ return /^https?:\/\//.test(path); }
 
   return (
     <div className="app">
@@ -480,35 +483,64 @@ function Layout() {
       <nav className="navbar" ref={navRef}>
         <div className="nav-inner">
           <div className="nav-links">
-            <NavLink to="/" end className={({isActive})=>`nav-btn${isActive?" nav-active":""}`} onClick={closeMenus}>
-              <i className="bx bx-home-alt"/> Todas
-            </NavLink>
-            <div className="nav-dropdown">
-              <button className="nav-btn" onClick={()=>setEreOpen(o=>!o)}>
-                <i className="bx bxs-trophy"/> Eredivisie
-                <i className={`bx ${ereOpen?"bx-chevron-up":"bx-chevron-down"} chevron-icon`}/>
-              </button>
-              {ereOpen&&(
-                <div className="dropdown">
-                  <Link to="/eredivisie" onClick={closeMenus}><i className="bx bx-bar-chart-alt-2"/> Classificação</Link>
-                  <Link to="/eredivisie" onClick={closeMenus}><i className="bx bx-football"/> Resultados</Link>
-                  <Link to="/eredivisie" onClick={closeMenus}><i className="bx bx-news"/> Notícias</Link>
-                </div>
-              )}
-            </div>
-            <NavLink to="/selecao-holandesa" className={({isActive})=>`nav-btn${isActive?" nav-active":""}`} onClick={closeMenus}>
-              <i className="bx bx-flag"/> Seleção Holandesa
-            </NavLink>
+            {menu.map(item=>{
+              const hasChildren = item.children && item.children.length > 0;
+              if (hasChildren) {
+                return (
+                  <div className="nav-dropdown" key={item.id}>
+                    <button className="nav-btn" onClick={()=>setOpenDropdownId(o=>o===item.id?null:item.id)}>
+                      <i className={item.icon}/> {item.label}
+                      <i className={`bx ${openDropdownId===item.id?"bx-chevron-up":"bx-chevron-down"} chevron-icon`}/>
+                    </button>
+                    {openDropdownId===item.id&&(
+                      <div className="dropdown">
+                        {item.children.map(child=>(
+                          isExternal(child.path)
+                            ? <a key={child.id} href={child.path} target="_blank" rel="noreferrer" onClick={closeMenus}><i className={child.icon}/> {child.label}</a>
+                            : <Link key={child.id} to={child.path} onClick={closeMenus}><i className={child.icon}/> {child.label}</Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              return isExternal(item.path) ? (
+                <a key={item.id} href={item.path} target="_blank" rel="noreferrer" className="nav-btn" onClick={closeMenus}>
+                  <i className={item.icon}/> {item.label}
+                </a>
+              ) : (
+                <NavLink key={item.id} to={item.path} end={item.path==="/"} className={({isActive})=>`nav-btn${isActive?" nav-active":""}`} onClick={closeMenus}>
+                  <i className={item.icon}/> {item.label}
+                </NavLink>
+              );
+            })}
           </div>
-          <button className="hamburger" onClick={()=>{setMenuOpen(o=>!o);setEreOpen(false);}} aria-label="Menu">
+          <button className="hamburger" onClick={()=>{setMenuOpen(o=>!o);setOpenDropdownId(null);}} aria-label="Menu">
             <i className={`bx ${menuOpen?"bx-x":"bx-menu"}`}/>
           </button>
         </div>
         {menuOpen&&(
           <div className="mobile-drawer">
-            <NavLink to="/" end className={({isActive})=>`mob-link${isActive?" mob-active":""}`} onClick={closeMenus}><i className="bx bx-home-alt"/> Todas</NavLink>
-            <NavLink to="/eredivisie" className={({isActive})=>`mob-link${isActive?" mob-active":""}`} onClick={closeMenus}><i className="bx bxs-trophy"/> Eredivisie</NavLink>
-            <NavLink to="/selecao-holandesa" className={({isActive})=>`mob-link${isActive?" mob-active":""}`} onClick={closeMenus}><i className="bx bx-flag"/> Seleção Holandesa</NavLink>
+            {menu.map(item=>{
+              const hasChildren = item.children && item.children.length > 0;
+              if (hasChildren) {
+                return (
+                  <div key={item.id}>
+                    <span className="mob-link" style={{opacity:0.6,cursor:"default"}}><i className={item.icon}/> {item.label}</span>
+                    {item.children.map(child=>(
+                      isExternal(child.path)
+                        ? <a key={child.id} href={child.path} target="_blank" rel="noreferrer" className="mob-link" style={{paddingLeft:"2.5rem"}} onClick={closeMenus}><i className={child.icon}/> {child.label}</a>
+                        : <NavLink key={child.id} to={child.path} className={({isActive})=>`mob-link${isActive?" mob-active":""}`} style={{paddingLeft:"2.5rem"}} onClick={closeMenus}><i className={child.icon}/> {child.label}</NavLink>
+                    ))}
+                  </div>
+                );
+              }
+              return isExternal(item.path) ? (
+                <a key={item.id} href={item.path} target="_blank" rel="noreferrer" className="mob-link" onClick={closeMenus}><i className={item.icon}/> {item.label}</a>
+              ) : (
+                <NavLink key={item.id} to={item.path} end={item.path==="/"} className={({isActive})=>`mob-link${isActive?" mob-active":""}`} onClick={closeMenus}><i className={item.icon}/> {item.label}</NavLink>
+              );
+            })}
             <button className="mob-link" onClick={()=>{closeMenus();navigate("/admin");}}><i className="bx bxs-dashboard"/> Painel Admin</button>
           </div>
         )}
