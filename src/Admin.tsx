@@ -158,6 +158,7 @@ function ArticleForm({ initial, categories, onSave, onCancel, saving }: {
   );
   const [tagInput, setTagInput] = useState(initial?.tags.join(", ") ?? "");
   const [errors,   setErrors]   = useState<Record<string, string>>({});
+  const [editorExpanded, setEditorExpanded] = useState(false);
 
   function set<K extends keyof ArticleInput>(k: K, v: ArticleInput[K]) {
     setForm(f => ({ ...f, [k]: v }));
@@ -214,10 +215,10 @@ function ArticleForm({ initial, categories, onSave, onCancel, saving }: {
       </div>
 
       {/* Formulário: layout 2 colunas → col esq: metadados | col dir: editor */}
-      <div className="adm-form-grid">
+      <div className={`adm-form-grid${editorExpanded ? " adm-form-grid-expanded" : ""}`}>
 
         {/* ── Coluna esquerda ── */}
-        <div className="adm-form-col">
+        <div className={`adm-form-col${editorExpanded ? " adm-form-col-hidden" : ""}`}>
           <div className={`adm-field ${errors.title ? "has-error" : ""}`}>
             <label>Título <span className="req">*</span></label>
             <input value={form.title} onChange={e => set("title", e.target.value)} placeholder="Título do artigo..."/>
@@ -341,12 +342,23 @@ function ArticleForm({ initial, categories, onSave, onCancel, saving }: {
         {/* ── Coluna direita: editor rico ── */}
         <div className="adm-form-col">
           <div className={`adm-field ${errors.body ? "has-error" : ""}`} style={{flex:1}}>
-            <label>Conteúdo do artigo <span className="req">*</span></label>
+            <div className="editor-label-row">
+              <label>Conteúdo do artigo <span className="req">*</span></label>
+              <button
+                type="button"
+                className="adm-btn adm-btn-ghost editor-expand-btn"
+                onClick={() => setEditorExpanded(e => !e)}
+                title={editorExpanded ? "Recolher editor" : "Expandir editor"}
+              >
+                <i className={`bx ${editorExpanded ? "bx-exit-fullscreen" : "bx-fullscreen"}`}/>
+                {editorExpanded ? "Recolher" : "Expandir"}
+              </button>
+            </div>
             {errors.body && <span className="field-err">{errors.body}</span>}
             <RichEditor
               value={form.bodyHtml ?? ""}
               onChange={html => set("bodyHtml", html)}
-              minHeight={460}
+              minHeight={editorExpanded ? 620 : 460}
             />
           </div>
         </div>

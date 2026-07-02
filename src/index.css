@@ -2131,3 +2131,47 @@ ul, ol  { list-style: none; }
   color: #fff !important;
 }
 .img-source-active i { color: #fff; }
+/* ── Editor expandido ────────────────────────────────────────────────────── */
+.adm-form-col-hidden {
+  display: none !important;
+}
+
+.adm-form-grid-expanded {
+  grid-template-columns: 1fr !important;
+}
+
+.adm-form-grid-expanded .adm-form-col {
+  max-width: 100% !important;
+}
+
+.editor-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.35rem;
+}
+
+.editor-label-row label {
+  margin-bottom: 0 !important;
+}
+
+.editor-expand-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem !important;
+  padding: 0.3rem 0.65rem !important;
+  border: 1px solid var(--border) !important;
+  color: var(--txt3) !important;
+  transition: all 0.15s;
+}
+
+.editor-expand-btn:hover {
+  color: var(--orange) !important;
+  border-color: var(--orange) !important;
+  background: var(--orange-light) !important;
+}
+
+.editor-expand-btn i {
+  font-size: 1rem;
+}
