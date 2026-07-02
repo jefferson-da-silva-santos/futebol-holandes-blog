@@ -30,12 +30,15 @@ export interface Category  { id: number; name: string; badgeClass: string; color
 export interface Article {
   id: number; title: string; slug: string; meta: string; date: string;
   image: string; icon: string; club?: string | null; tags: string[]; body: string[];
+  bodyHtml: string;
   published: boolean; featured: boolean; createdAt: string; updatedAt: string;
   category: Category; catClass?: string;
 }
 export interface ArticleInput {
-  title: string; meta: string; date: string; image: string; icon?: string;
-  club?: string; tags?: string[]; body: string[];
+  title: string; meta: string; date: string; image: string;
+  imageSource?: "url" | "drive";
+  icon?: string; club?: string; tags?: string[];
+  body?: string[]; bodyHtml?: string;
   published?: boolean; featured?: boolean; categoryId: number;
 }
 export interface PaginatedArticles {

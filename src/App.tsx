@@ -381,7 +381,11 @@ function ArticlePage() {
   }
 
   const related = articles.filter(a=>a.id!==article.id&&a.category.id===article.category.id).slice(0,2);
-  const readTime = Math.max(1, Math.ceil(article.body.join(" ").split(" ").length/200));
+  // bodyHtml para novos artigos, body legado para artigos antigos
+  const rawText = article.bodyHtml
+    ? article.bodyHtml.replace(/<[^>]+>/g, " ")
+    : article.body.join(" ");
+  const readTime = Math.max(1, Math.ceil(rawText.split(" ").filter(Boolean).length / 200));
 
   return (
     <div className="article-layout">
@@ -407,7 +411,12 @@ function ArticlePage() {
               <span className="art-meta-item"><i className="bx bx-time-five"/> {readTime} min de leitura</span>
             </div>
           </header>
-          <div className="art-body">{article.body.map((p,i)=><p key={i}>{p}</p>)}</div>
+          <div className="art-body">
+            {article.bodyHtml
+              ? <div dangerouslySetInnerHTML={{__html: article.bodyHtml}}/>
+              : article.body.map((p,i)=><p key={i}>{p}</p>)
+            }
+          </div>
           <footer className="art-footer">
             <div className="art-tags">
               {article.tags.map(t=><span key={t} className="art-tag"><i className="bx bx-hash"/>{t}</span>)}
