@@ -92,7 +92,6 @@ function LoginScreen({ onLogin }: { onLogin:(u:AdminUser)=>void }) {
             {loading?<><i className="bx bx-loader-alt bx-spin"/> Entrando...</>:<><i className="bx bx-log-in"/> Entrar</>}
           </button>
         </form>
-        <p className="login-hint"><i className="bx bx-info-circle"/> Primeiro acesso? Use <code>POST /setup</code> para criar o admin.</p>
       </div>
     </div>
   );
