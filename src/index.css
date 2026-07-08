@@ -2131,225 +2131,177 @@ ul, ol  { list-style: none; }
   color: #fff !important;
 }
 .img-source-active i { color: #fff; }
-/* ── Editor expandido ────────────────────────────────────────────────────── */
-.adm-form-col-hidden {
-  display: none !important;
+/* ═══════════════════════════════════════════════════════════════════════════
+   YOUTUBE EMBED
+   ═══════════════════════════════════════════════════════════════════════════ */
+.yt-embed-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--r-lg, 12px);
+  overflow: hidden;
+  margin: 1.25rem 0;
+  background: #000;
 }
-
-.adm-form-grid-expanded {
-  grid-template-columns: 1fr !important;
+.yt-embed-iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
 }
-
-.adm-form-grid-expanded .adm-form-col {
-  max-width: 100% !important;
-}
-
-.editor-label-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.35rem;
-}
-
-.editor-label-row label {
-  margin-bottom: 0 !important;
-}
-
-.editor-expand-btn {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.75rem !important;
-  padding: 0.3rem 0.65rem !important;
-  border: 1px solid var(--border) !important;
-  color: var(--txt3) !important;
-  transition: all 0.15s;
-}
-
-.editor-expand-btn:hover {
-  color: var(--orange) !important;
-  border-color: var(--orange) !important;
-  background: var(--orange-light) !important;
-}
-
-.editor-expand-btn i {
-  font-size: 1rem;
+/* Badge de overlay no editor */
+.yt-embed-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: rgba(255,0,0,0.85);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  pointer-events: none;
+  letter-spacing: 0.04em;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   RICH EDITOR — Embeds (YouTube, Twitter/X) + Imagem inline
+   TWITTER / X EMBED — preview no editor e widget no site
    ═══════════════════════════════════════════════════════════════════════════ */
-
-/* ── YouTube ──────────────────────────────────────────────────────────────── */
-.rich-content .re-youtube,
-.art-body iframe[src*="youtube"] {
-  width: 100% !important;
-  aspect-ratio: 16/9;
-  border-radius: var(--r-lg);
-  border: none;
-  margin: 1rem 0;
-  display: block;
+.tweet-embed-wrap {
+  margin: 1.25rem 0;
 }
-
-/* ── Twitter/X embed preview no editor ───────────────────────────────────── */
-.twitter-embed-block {
-  margin: 1rem 0;
-  border-radius: var(--r-lg);
-  overflow: hidden;
-  user-select: none;
-}
-.twitter-embed-preview {
-  background: var(--surface);
-  border: 1.5px solid var(--border);
-  border-radius: var(--r-lg);
+/* Preview no editor */
+.tweet-editor-preview {
+  border: 1.5px solid var(--border, #e2e5ea);
+  border-radius: var(--r-lg, 12px);
   padding: 0.85rem 1rem;
+  background: var(--surface, #fff);
 }
-.twitter-embed-preview-header {
+.tweet-preview-header {
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   font-weight: 700;
-  color: var(--txt2);
+  color: var(--txt1, #111);
   margin-bottom: 0.45rem;
 }
-.twitter-embed-preview-url {
+.tweet-preview-url {
   font-size: 0.78rem;
-  color: var(--orange);
+  color: #1d9bf0;
   word-break: break-all;
   display: block;
+  margin-bottom: 0.35rem;
 }
-.twitter-embed-preview-hint {
-  font-size: 0.72rem;
-  color: var(--txt3);
-  margin-top: 0.3rem;
+.tweet-preview-note {
+  font-size: 0.7rem;
+  color: var(--txt3, #9aa0ab);
+  margin: 0;
 }
-
-/* ── Twitter/X embed renderizado no site ─────────────────────────────────── */
-.art-body .twitter-embed-block,
-.art-body [data-tweet-url] {
+/* Widget real no site — centralizado */
+.art-body .tweet-embed-wrap {
   display: flex;
   justify-content: center;
-  margin: 1.25rem 0;
 }
-.art-body .twitter-embed-block > .twitter-widget-0 {
+.art-body .tweet-embed-wrap > * {
   max-width: 550px !important;
   width: 100% !important;
 }
 
-/* ── Imagem inline no editor e no site ───────────────────────────────────── */
-.rich-content .re-img,
-.art-body img:not(.thumb-img):not(.hero-img):not(.footer-logo-img):not(.logo-img):not(.adm-logo) {
-  max-width: 100%;
-  border-radius: var(--r-lg);
-  margin: 1rem 0;
-  display: block;
-  box-shadow: var(--shadow-s);
-}
-
-/* ── Modais de embed ─────────────────────────────────────────────────────── */
-.rich-modal-backdrop {
+/* ═══════════════════════════════════════════════════════════════════════════
+   MODAL DE EMBED (YouTube / Twitter)
+   ═══════════════════════════════════════════════════════════════════════════ */
+.embed-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.45);
+  background: rgba(0,0,0,0.5);
   z-index: 10000;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 1rem;
-  animation: fadeIn 0.15s ease;
 }
-.rich-modal {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-xl);
-  box-shadow: var(--shadow-xl);
+.embed-modal {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #e2e5ea);
+  border-radius: var(--r-xl, 16px);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
   width: 100%;
-  max-width: 440px;
+  max-width: 460px;
   overflow: hidden;
-  animation: fadeUp 0.2s ease;
 }
-.rich-modal-header {
+.embed-modal-head {
   display: flex;
   align-items: center;
   gap: 0.55rem;
   padding: 1rem 1.25rem;
-  background: var(--surface2);
-  border-bottom: 1px solid var(--border);
+  background: var(--surface2, #f8f9fb);
+  border-bottom: 1px solid var(--border, #e2e5ea);
   font-size: 0.9rem;
   font-weight: 700;
-  color: var(--txt1);
+  color: var(--txt1, #111);
 }
-.rich-modal-header i { font-size: 1.2rem; color: var(--orange); }
-.rich-modal-close {
+.embed-modal-close {
   margin-left: auto;
-  color: var(--txt3);
-  font-size: 1.1rem;
+  color: var(--txt3, #9aa0ab);
+  font-size: 1.25rem;
   cursor: pointer;
   transition: color 0.12s;
+  line-height: 1;
 }
-.rich-modal-close:hover { color: var(--txt1); }
-.rich-modal-body {
+.embed-modal-close:hover { color: var(--txt1, #111); }
+.embed-modal-body {
   padding: 1.25rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.6rem;
 }
-.rich-modal-label {
+.embed-modal-label {
   font-size: 0.75rem;
   font-weight: 700;
-  color: var(--txt2);
+  color: var(--txt2, #4b5563);
   letter-spacing: 0.03em;
 }
-.rich-modal-input {
+.embed-modal-input {
   width: 100%;
-  padding: 0.55rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
+  padding: 0.6rem 0.85rem;
+  border: 1.5px solid var(--border, #e2e5ea);
+  border-radius: var(--r-md, 8px);
   font-size: 0.85rem;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  outline: none;
 }
-.rich-modal-input:focus { border-color: var(--orange); outline: none; box-shadow: 0 0 0 3px rgba(255,98,0,0.08); }
-.rich-modal-error {
+.embed-modal-input:focus {
+  border-color: #FF6200;
+  box-shadow: 0 0 0 3px rgba(255,98,0,0.1);
+}
+.embed-modal-error {
   display: flex;
-  align-items: center;
-  gap: 0.35rem;
+  align-items: flex-start;
+  gap: 0.4rem;
   font-size: 0.78rem;
-  color: var(--red);
+  color: #dc2626;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 0.5rem 0.65rem;
 }
-.rich-modal-footer {
+.embed-modal-error i { font-size: 1rem; flex-shrink: 0; margin-top: 1px; }
+.embed-modal-hint {
+  font-size: 0.78rem;
+  color: var(--txt3, #9aa0ab);
+  background: var(--surface2, #f8f9fb);
+  border-radius: 6px;
+  padding: 0.55rem 0.75rem;
+}
+.embed-modal-hint p { margin: 0; }
+.embed-modal-foot {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 0.65rem;
   padding: 0.85rem 1.25rem;
-  border-top: 1px solid var(--border);
-  background: var(--surface2);
+  border-top: 1px solid var(--border, #e2e5ea);
+  background: var(--surface2, #f8f9fb);
 }
-
-/* ── Upload área da capa ─────────────────────────────────────────────────── */
-.img-upload-area {
-  display: block;
-  cursor: pointer;
-  border: 2px dashed var(--border);
-  border-radius: var(--r-md);
-  transition: border-color 0.15s, background 0.15s;
-}
-.img-upload-area:hover { border-color: var(--orange); background: var(--orange-light); }
-.img-upload-placeholder,
-.img-upload-loading,
-.img-upload-done {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 1.5rem 1rem;
-  text-align: center;
-  color: var(--txt3);
-  font-size: 0.82rem;
-}
-.img-upload-placeholder i { font-size: 2rem; color: var(--orange); }
-.img-upload-loading i     { font-size: 1.5rem; color: var(--orange); }
-.img-upload-done i        { font-size: 1.5rem; }
-.img-upload-done span     { color: var(--txt2); font-weight: 600; }
-.img-upload-placeholder small { color: var(--txt3); font-size: 0.72rem; }

@@ -2,10 +2,10 @@ const BASE = "https://api-futebool-holandes.vercel.app";
 const TOKEN_KEY = "fh_admin_token";
 
 export const auth = {
-  getToken: ()          => localStorage.getItem(TOKEN_KEY),
+  getToken: () => localStorage.getItem(TOKEN_KEY),
   setToken: (t: string) => localStorage.setItem(TOKEN_KEY, t),
-  clear:    ()          => localStorage.removeItem(TOKEN_KEY),
-  isLogged: ()          => !!localStorage.getItem(TOKEN_KEY),
+  clear: () => localStorage.removeItem(TOKEN_KEY),
+  isLogged: () => !!localStorage.getItem(TOKEN_KEY),
 };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -15,18 +15,18 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...(init?.headers as Record<string, string> ?? {}),
   };
   if (token) headers["Authorization"] = `Bearer ${token}`;
-  const res  = await fetch(`${BASE}${path}`, { ...init, headers });
+  const res = await fetch(`${BASE}${path}`, { ...init, headers });
   const json = await res.json();
   if (res.status === 401) { auth.clear(); throw new AuthError(json.error ?? "Sessão expirada."); }
   if (!res.ok || !json.success) throw new Error(json.error ?? "Erro desconhecido");
   return json.data as T;
 }
 
-export class AuthError extends Error {}
+export class AuthError extends Error { }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface AdminUser { id: number; name: string; email: string; lastLoginAt?: string; }
-export interface Category  { id: number; name: string; badgeClass: string; color: string; _count?: { articles: number }; }
+export interface Category { id: number; name: string; badgeClass: string; color: string; _count?: { articles: number }; }
 export interface Article {
   id: number; title: string; slug: string; meta: string; date: string;
   image: string; icon: string; club?: string | null; tags: string[]; body: string[];
@@ -142,20 +142,20 @@ export const authApi = {
 export const articlesApi = {
   list(params?: { category?: string; published?: boolean; featured?: boolean; search?: string; page?: number; limit?: number }) {
     const q = new URLSearchParams();
-    if (params?.category)                q.set("category", params.category);
+    if (params?.category) q.set("category", params.category);
     if (params?.published !== undefined) q.set("published", String(params.published));
-    if (params?.featured  !== undefined) q.set("featured",  String(params.featured));
-    if (params?.search)                  q.set("search", params.search);
-    if (params?.page)                    q.set("page", String(params.page));
-    if (params?.limit)                   q.set("limit", String(params.limit));
+    if (params?.featured !== undefined) q.set("featured", String(params.featured));
+    if (params?.search) q.set("search", params.search);
+    if (params?.page) q.set("page", String(params.page));
+    if (params?.limit) q.set("limit", String(params.limit));
     const qs = q.toString();
     return request<PaginatedArticles>(`/articles${qs ? `?${qs}` : ""}`);
   },
-  get(idOrSlug: string | number)    { return request<Article>(`/articles/${idOrSlug}`); },
-  create(data: ArticleInput)        { return request<Article>("/articles", { method: "POST", body: JSON.stringify(data) }); },
+  get(idOrSlug: string | number) { return request<Article>(`/articles/${idOrSlug}`); },
+  create(data: ArticleInput) { return request<Article>("/articles", { method: "POST", body: JSON.stringify(data) }); },
   update(id: number, data: ArticleInput) { return request<Article>(`/articles/${id}`, { method: "PUT", body: JSON.stringify(data) }); },
   patch(id: number, data: Partial<ArticleInput>) { return request<Article>(`/articles/${id}`, { method: "PATCH", body: JSON.stringify(data) }); },
-  delete(id: number)                { return request<{ deleted: boolean }>(`/articles/${id}`, { method: "DELETE" }); },
+  delete(id: number) { return request<{ deleted: boolean }>(`/articles/${id}`, { method: "DELETE" }); },
 };
 
 // ─── Categories API ───────────────────────────────────────────────────────────
@@ -212,7 +212,7 @@ export const scorersApi = {
 
 // ─── Config API ───────────────────────────────────────────────────────────────
 export const configApi = {
-  get()                  { return request<SiteConfig>("/config"); },
+  get() { return request<SiteConfig>("/config"); },
   update(data: Partial<SiteConfig>) {
     return request<SiteConfig>("/config", { method: "PATCH", body: JSON.stringify(data) });
   },
@@ -220,7 +220,7 @@ export const configApi = {
 
 // ─── Menu API ─────────────────────────────────────────────────────────────────
 export const menuApi = {
-  get()    { return request<MenuItem[]>("/menu"); },
+  get() { return request<MenuItem[]>("/menu"); },
   getAll() { return request<MenuItem[]>("/menu/all"); },
   update(items: MenuItemInput[]) {
     return request<MenuItem[]>("/menu", { method: "PUT", body: JSON.stringify({ items }) });
