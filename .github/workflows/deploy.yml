@@ -5,8 +5,8 @@ name: Build e Deploy para Hostinger
 on:
   push:
     branches:
-      - main         # dispara ao fazer push na branch main
-  workflow_dispatch: # permite rodar manualmente pelo GitHub
+      - main
+  workflow_dispatch:
 
 jobs:
   build-and-deploy:
@@ -14,38 +14,34 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Baixa o código do repositório
       - name: Checkout do repositório
         uses: actions/checkout@v4
 
-      # 2. Configura o Node.js (mesma versão que você usa localmente)
       - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'  # cache das dependências para acelerar próximos builds
+          cache: 'npm'
 
-      # 3. Instala as dependências (usa npm ci para garantir versões exatas do lock)
       - name: Instalar dependências
         run: npm ci
 
-      # 4. Gera o build de produção (cria a pasta dist/)
       - name: Build de produção
         run: npm run build
         env:
-          # Variáveis de ambiente do Vite (VITE_* são expostas no build)
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
 
-      # 5. Faz o deploy via FTP para a Hostinger
-      - name: Deploy via FTP para Hostinger
+      - name: Deploy via FTPS para Hostinger
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_HOST }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: ./dist/         # pasta gerada pelo Vite
-          server-dir: /public_html/  # pasta raiz do site na Hostinger
-          dangerous-clean-slate: false  # NÃO apaga tudo antes — só envia o que mudou
+          local-dir: ./dist/
+          server-dir: /public_html/
+          port: 21
+          protocol: ftps        # ← só isso que mudou
+          dangerous-clean-slate: false
           exclude: |
             **/.git*
             **/.git*/**
