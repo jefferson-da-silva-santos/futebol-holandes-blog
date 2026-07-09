@@ -6,7 +6,7 @@ import {
   type Article, type Standing, type Convocation, type Fixture,
   type NationsGroup, type TopScorer, type SiteConfig, type MenuItem,
 } from "./api";
-import { useNotyf } from "./useNotyf";
+import { useToast, ToastProvider } from "./utils/toast";
 import Admin from "./Admin";
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -36,7 +36,7 @@ function DataProvider({ children }: { children: ReactNode }) {
   const [config, setConfig] = useState<SiteConfig>({});
   const [menu, setMenu] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const notyf = useNotyf();
+  const notyf = useToast();
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -742,8 +742,9 @@ function Layout() {
 // ═════════════════════════════════════════════════════════════════════════════
 export default function App() {
   return (
-    <DataProvider>
-      <Routes>
+    <ToastProvider>
+      <DataProvider>
+        <Routes>
         <Route path="/admin/*" element={<Admin />} />
         <Route element={<Layout />}>
           <Route path="/" element={<HomePage />} />
@@ -752,7 +753,8 @@ export default function App() {
           <Route path="/noticia/:slug" element={<ArticlePage />} />
           <Route path="*" element={<HomePage />} />
         </Route>
-      </Routes>
-    </DataProvider>
+        </Routes>
+      </DataProvider>
+    </ToastProvider>
   );
 }
