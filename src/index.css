@@ -1366,23 +1366,150 @@ ul, ol  { list-style: none; }
   0%   { background-position: -700px 0; }
   100% { background-position: 700px 0; }
 }
-.skeleton {
-  background: linear-gradient(90deg, var(--bg2) 25%, var(--border) 50%, var(--bg2) 75%);
-  background-size: 700px 100%;
-  animation: shimmer 1.4s infinite linear;
-  border-radius: var(--r-lg);
+/* ═══════════════════════════════════════════════════════════════════════════
+   SKELETON LOADING — Sistema profissional
+   Cada componente espelha o layout real da página
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Base shimmer ─────────────────────────────────────────────────────────── */
+.sk {
+  background: linear-gradient(
+    90deg,
+    var(--bg2) 0%,
+    var(--border) 40%,
+    var(--bg2) 80%
+  );
+  background-size: 600px 100%;
+  animation: sk-shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--r-md);
+  flex-shrink: 0;
 }
-.skeleton-hero-grid {
+@keyframes sk-shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position:  600px 0; }
+}
+.sk-fill { width: 100%; height: 100%; border-radius: 0; }
+
+/* ── Section head ─────────────────────────────────────────────────────────── */
+.sk-section-head { display: flex; align-items: center; margin-bottom: 1rem; }
+.sk-label { height: 20px; width: 140px; border-radius: 20px; }
+
+/* ── Hero grid ────────────────────────────────────────────────────────────── */
+.sk-hero-grid {
   display: grid;
   grid-template-columns: 1.15fr 1fr;
   gap: 0.6rem;
+  margin-bottom: 1.75rem;
+}
+.sk-hero-sub { display: flex; flex-direction: column; gap: 0.6rem; }
+
+.sk-hero-large {
+  position: relative;
+  min-height: 340px;
+  border-radius: var(--r-xl);
+  overflow: hidden;
+}
+.sk-hero-small {
+  position: relative;
+  flex: 1;
+  min-height: 158px;
+  border-radius: var(--r-xl);
+  overflow: hidden;
+}
+
+/* Overlay com elementos internos do hero */
+.sk-hero-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 1.2rem 1.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  background: linear-gradient(to top, rgba(0,0,0,0.45) 0%, transparent 100%);
+}
+.sk-badge        { height: 22px; width: 90px; border-radius: 20px; background: rgba(255,255,255,0.18); animation: none; }
+.sk-badge-sm     { width: 70px; height: 18px; }
+.sk-hero-title   { height: 26px; width: 85%; border-radius: 6px; background: rgba(255,255,255,0.2); animation: none; }
+.sk-hero-title-sm { height: 18px; width: 90%; }
+.sk-hero-meta    { height: 14px; width: 55%; border-radius: 4px; background: rgba(255,255,255,0.15); animation: none; }
+
+/* ── Cards de notícia ─────────────────────────────────────────────────────── */
+.sk-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-s);
+}
+.sk-card-thumb { height: 170px; width: 100%; border-radius: 0; }
+.sk-card-body  { padding: 1rem; display: flex; flex-direction: column; gap: 0.55rem; }
+.sk-card-cat   { height: 13px; width: 80px; border-radius: 10px; }
+.sk-card-title { height: 16px; width: 100%; }
+.sk-card-title-short { width: 65%; }
+.sk-card-date  { height: 12px; width: 90px; margin-top: 0.15rem; }
+
+/* ── Widget de sidebar ────────────────────────────────────────────────────── */
+.sk-widget {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-s);
+  margin-bottom: 1rem;
+}
+.sk-widget-head {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+}
+.sk-widget-icon  { width: 18px; height: 18px; border-radius: 4px; }
+.sk-widget-title { height: 14px; width: 130px; border-radius: 8px; }
+
+.sk-widget-rows { padding: 0.4rem 0; }
+.sk-widget-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.sk-widget-row:last-child { border-bottom: none; }
+.sk-wr-pos  { width: 18px;  height: 13px; border-radius: 3px; flex-shrink: 0; }
+.sk-wr-name { flex: 1;      height: 13px; border-radius: 6px; }
+.sk-wr-num  { width: 22px;  height: 13px; border-radius: 3px; flex-shrink: 0; }
+.sk-wr-pts  { width: 26px;  height: 13px; border-radius: 3px; flex-shrink: 0; }
+
+/* ── Skeleton da página de artigo ────────────────────────────────────────── */
+.sk-art-hero {
+  height: 340px;
+  border-radius: var(--r-xl);
+  overflow: hidden;
   margin-bottom: 1.5rem;
 }
-.skeleton-hero-sub { display: flex; flex-direction: column; gap: 0.6rem; }
-.skeleton-hero-large { height: 340px; }
-.skeleton-hero-small { height: 158px; flex: 1; }
-.skeleton-card { height: 220px; }
-.skeleton-widget { height: 400px; }
+.sk-art-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  padding: 1.75rem 2rem;
+  box-shadow: var(--shadow-s);
+}
+.sk-art-badges     { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+.sk-art-title      { height: 32px; width: 100%; margin-bottom: 0.6rem; }
+.sk-art-title-short{ width: 70%; }
+.sk-art-meta       { display: flex; gap: 1rem; margin: 1rem 0 1.5rem; }
+.sk-art-meta-item  { height: 14px; width: 120px; border-radius: 8px; }
+.sk-art-body       { display: flex; flex-direction: column; }
+
+/* ── Responsivo ───────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .sk-hero-grid { grid-template-columns: 1fr; }
+  .sk-hero-sub  { flex-direction: row; }
+}
 
 /* ── Admin extras ─────────────────────────────────────────────────────────────── */
 .adm-row-draft { opacity: 0.65; }

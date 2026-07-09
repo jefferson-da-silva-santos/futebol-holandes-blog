@@ -175,22 +175,127 @@ function HeroCard({ article, size, onClick }: { article: Article; size: "large" 
   );
 }
 
-function PageSkeleton() {
+// ─── Skeleton primitivos ─────────────────────────────────────────────────────
+function Sk({ className = "", style = {} }: { className?: string; style?: React.CSSProperties }) {
+  return <div className={`sk ${className}`} style={style} />;
+}
+
+function SkSectionHead() {
+  return (
+    <div className="sk-section-head">
+      <Sk className="sk-label" />
+    </div>
+  );
+}
+
+function SkHeroLarge() {
+  return (
+    <div className="sk-hero-large">
+      <Sk className="sk-fill" />
+      <div className="sk-hero-overlay">
+        <Sk className="sk-badge" />
+        <Sk className="sk-hero-title" />
+        <Sk className="sk-hero-meta" />
+      </div>
+    </div>
+  );
+}
+
+function SkHeroSmall() {
+  return (
+    <div className="sk-hero-small">
+      <Sk className="sk-fill" />
+      <div className="sk-hero-overlay">
+        <Sk className="sk-badge sk-badge-sm" />
+        <Sk className="sk-hero-title sk-hero-title-sm" />
+        <Sk className="sk-hero-meta" />
+      </div>
+    </div>
+  );
+}
+
+function SkCard() {
+  return (
+    <div className="sk-card">
+      <Sk className="sk-card-thumb" />
+      <div className="sk-card-body">
+        <Sk className="sk-card-cat" />
+        <Sk className="sk-card-title" />
+        <Sk className="sk-card-title sk-card-title-short" />
+        <Sk className="sk-card-date" />
+      </div>
+    </div>
+  );
+}
+
+function SkWidget() {
+  return (
+    <div className="sk-widget">
+      <div className="sk-widget-head">
+        <Sk className="sk-widget-icon" />
+        <Sk className="sk-widget-title" />
+      </div>
+      <div className="sk-widget-rows">
+        {[1,2,3,4,5,6].map(i => (
+          <div key={i} className="sk-widget-row">
+            <Sk className="sk-wr-pos" />
+            <Sk className="sk-wr-name" />
+            <Sk className="sk-wr-num" />
+            <Sk className="sk-wr-num" />
+            <Sk className="sk-wr-num" />
+            <Sk className="sk-wr-pts" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SkArticlePage() {
+  return (
+    <div className="article-layout">
+      <main className="main">
+        <div className="sk-art-hero"><Sk className="sk-fill" /></div>
+        <div className="sk-art-card">
+          <div className="sk-art-badges"><Sk className="sk-badge" /></div>
+          <Sk className="sk-art-title" />
+          <Sk className="sk-art-title sk-art-title-short" />
+          <div className="sk-art-meta"><Sk className="sk-art-meta-item" /><Sk className="sk-art-meta-item" /></div>
+          <div className="sk-art-body">
+            {[100,90,95,80,100,75,88].map((w,i) => <Sk key={i} style={{width:`${w}%`,height:"16px",marginBottom:"0.6rem"}} />)}
+          </div>
+        </div>
+      </main>
+      <aside className="sidebar">
+        <SkWidget />
+      </aside>
+    </div>
+  );
+}
+
+function PageSkeleton({ variant = "home" }: { variant?: "home" | "eredivisie" | "selecao" | "article" }) {
+  if (variant === "article") return <SkArticlePage />;
+
   return (
     <div className="layout-grid">
       <main className="main">
-        <div className="skeleton-hero-grid">
-          <div className="skeleton skeleton-hero-large" />
-          <div className="skeleton-hero-sub">
-            <div className="skeleton skeleton-hero-small" />
-            <div className="skeleton skeleton-hero-small" />
+        <SkSectionHead />
+        <div className="sk-hero-grid">
+          <SkHeroLarge />
+          <div className="sk-hero-sub">
+            <SkHeroSmall />
+            <SkHeroSmall />
           </div>
         </div>
-        <div className="news-grid" style={{ marginTop: "1.5rem" }}>
-          {[1, 2, 3].map(i => <div key={i} className="skeleton skeleton-card" />)}
+        <SkSectionHead />
+        <div className="news-grid">
+          <SkCard /><SkCard /><SkCard />
         </div>
       </main>
-      <aside className="sidebar"><div className="skeleton skeleton-widget" /></aside>
+      <aside className="sidebar">
+        <SkWidget />
+        {variant === "home" && <SkWidget />}
+      </aside>
     </div>
   );
 }
@@ -201,7 +306,7 @@ function PageSkeleton() {
 function HomePage() {
   const { articles, standing, nations, loading } = useSiteData();
   const navigate = useNavigate();
-  if (loading) return <PageSkeleton />;
+  if (loading) return <PageSkeleton variant="home" />;
 
   const published = articles.filter(a => a.published);
   const highlights = published.slice(0, 3);
@@ -244,7 +349,7 @@ function HomePage() {
 function EredivisieePage() {
   const { articles, standing, config, loading } = useSiteData();
   const navigate = useNavigate();
-  if (loading) return <PageSkeleton />;
+  if (loading) return <PageSkeleton variant="eredivisie" />;
 
   const news = articles.filter(a => a.category.name === "Eredivisie" && a.published);
   const openArticle = (slug: string) => navigate(`/noticia/${slug}`);
@@ -299,7 +404,7 @@ function EredivisieePage() {
 function SelecaoPage() {
   const { articles, nations, scorers, convocation, fixtures, loading } = useSiteData();
   const navigate = useNavigate();
-  if (loading) return <PageSkeleton />;
+  if (loading) return <PageSkeleton variant="selecao" />;
 
   const news = articles.filter(a => a.category.name === "Seleção Holandesa" && a.published);
   const openArticle = (slug: string) => navigate(`/noticia/${slug}`);
@@ -430,7 +535,7 @@ function ArticlePage() {
 
   useEffect(() => { window.scrollTo({ top: 0, behavior: "smooth" }); }, [slug]);
 
-  if (loading) return <PageSkeleton />;
+  if (loading) return <PageSkeleton variant="article" />;
 
   if (!article) {
     return (
