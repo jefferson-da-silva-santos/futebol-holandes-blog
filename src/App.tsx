@@ -338,7 +338,7 @@ function PageSkeleton({ variant = "home" }: { variant?: "home" | "eredivisie" | 
 function HomePage() {
   const { articles, standing, nations, loading } = useSiteData();
   const navigate = useNavigate();
-  if (loading) return <PageSkeleton variant="home" />;
+  if (!loading) return <PageSkeleton variant="home" />;
 
   const published = articles.filter(a => a.published);
   const highlights = published.slice(0, 3);

@@ -12,6 +12,23 @@ import {
   type NationsEntry, type SiteConfig, type MenuItem, type MenuItemInput,
 } from "./api";
 
+// ─── Migração de conteúdo legado ──────────────────────────────────────────────
+// Artigos antigos guardam o texto em `body` (array de parágrafos simples),
+// de antes do editor rico existir. Quando `bodyHtml` está vazio mas `body` tem
+// conteúdo, convertemos para HTML aqui para que o texto apareça no editor ao
+// abrir o artigo para edição — sem isso, o editor carrega em branco.
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function legacyBodyToHtml(body: string[]): string {
+  return body
+    .flatMap(block => block.split(/\n{2,}/)) // separa blocos colados com múltiplas quebras de linha
+    .map(p => p.trim())
+    .filter(Boolean)
+    .map(p => `<p>${escapeHtml(p).replace(/\n/g, "<br>")}</p>`)
+    .join("");
+}
+
 const ICONS: { cls: string; label: string }[] = [
   { cls: "bx bxs-trophy", label: "Troféu" },
   { cls: "bx bxs-medal", label: "Medalha" },
@@ -142,7 +159,12 @@ function ArticleForm({ initial, categories, onSave, onCancel, saving }: {
       ? {
         title: initial.title, meta: initial.meta, date: initial.date, image: initial.image,
         icon: initial.icon, club: initial.club ?? "", tags: initial.tags,
-        body: initial.body, bodyHtml: initial.bodyHtml ?? "",
+        body: initial.body,
+        // Se bodyHtml estiver vazio mas houver conteúdo legado em body[], migra para HTML
+        // para que o texto apareça no editor em vez de abrir em branco.
+        bodyHtml: (initial.bodyHtml && initial.bodyHtml.trim() !== "")
+          ? initial.bodyHtml
+          : legacyBodyToHtml(initial.body ?? []),
         imageSource: "url" as const,
         published: initial.published, featured: initial.featured ?? false,
         categoryId: initial.category.id,
@@ -1302,7 +1324,7 @@ export default function Admin() {
   if (checking) return <div className="login-root"><div className="adm-loading"><i className="bx bx-loader-alt bx-spin adm-loading-icon" /><p>Verificando sessão...</p></div></div>;
   if (!user) return <LoginScreen onLogin={u => setUser(u)} />;
   return <AdminPanel user={user} onLogout={() => { authApi.logout(); setUser(null); }} onExit={() => {
-    navigate("/")
+    navigate("/");
     window.location.reload();
   }} />;
 }
