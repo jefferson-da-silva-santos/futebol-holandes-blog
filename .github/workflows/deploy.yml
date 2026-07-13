@@ -34,11 +34,19 @@ jobs:
       - name: Deploy via SSH + rsync para Hostinger
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 700 ~/.ssh
+
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
+
+          # Valida a chave ANTES de tentar conectar — se estiver corrompida, falha aqui com mensagem clara
+          ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null
+
           ssh-keyscan -p 65002 ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
           rsync -avz --delete \
-            -e "ssh -i ~/.ssh/deploy_key -p 65002 -o StrictHostKeyChecking=no" \
+            -e "ssh -v -i ~/.ssh/deploy_key -p 65002 -o StrictHostKeyChecking=no" \
             ./dist/ \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/domains/futebolholandes.blog.br/public_html/
+
           rm -f ~/.ssh/deploy_key
