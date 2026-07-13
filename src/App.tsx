@@ -72,6 +72,38 @@ function useSiteData() {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
+//  LIGHTBOX — modal de visualização de imagem
+// ═════════════════════════════════════════════════════════════════════════════
+interface LightboxData { src: string; alt: string; }
+
+function Lightbox({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [onClose]);
+
+  return (
+    <div className="lightbox-backdrop" onClick={onClose}>
+      <button className="lightbox-close" onClick={onClose} aria-label="Fechar">
+        <i className="bx bx-x" />
+      </button>
+      <img
+        src={src}
+        alt={alt}
+        className="lightbox-img"
+        onClick={e => e.stopPropagation()}
+      />
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
 //  WIDGETS
 // ═════════════════════════════════════════════════════════════════════════════
 function StandingsWidget({ standing }: { standing: Standing | null }) {
@@ -236,7 +268,7 @@ function SkWidget() {
         <Sk className="sk-widget-title" />
       </div>
       <div className="sk-widget-rows">
-        {[1,2,3,4,5,6].map(i => (
+        {[1, 2, 3, 4, 5, 6].map(i => (
           <div key={i} className="sk-widget-row">
             <Sk className="sk-wr-pos" />
             <Sk className="sk-wr-name" />
@@ -262,7 +294,7 @@ function SkArticlePage() {
           <Sk className="sk-art-title sk-art-title-short" />
           <div className="sk-art-meta"><Sk className="sk-art-meta-item" /><Sk className="sk-art-meta-item" /></div>
           <div className="sk-art-body">
-            {[100,90,95,80,100,75,88].map((w,i) => <Sk key={i} style={{width:`${w}%`,height:"16px",marginBottom:"0.6rem"}} />)}
+            {[100, 90, 95, 80, 100, 75, 88].map((w, i) => <Sk key={i} style={{ width: `${w}%`, height: "16px", marginBottom: "0.6rem" }} />)}
           </div>
         </div>
       </main>
@@ -461,15 +493,32 @@ function SelecaoPage() {
   );
 }
 
-// Renderiza o corpo do artigo e ativa embeds do Twitter após montagem
-function ArticleBody({ bodyHtml, body }: { bodyHtml: string; body: string[] }) {
+// Renderiza o corpo do artigo, ativa embeds do Twitter/Instagram e abre o lightbox ao clicar em imagens
+function ArticleBody({
+  bodyHtml, body, onImageClick,
+}: {
+  bodyHtml: string;
+  body: string[];
+  onImageClick: (img: LightboxData) => void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!bodyHtml || !ref.current) return;
+    const container = ref.current;
+
+    // ── Clique nas imagens do corpo → abre o lightbox ─────────────────────
+    function handleClick(e: MouseEvent) {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "IMG" && target.classList.contains("re-img")) {
+        const img = target as HTMLImageElement;
+        onImageClick({ src: img.currentSrc || img.src, alt: img.alt || "" });
+      }
+    }
+    container.addEventListener("click", handleClick);
 
     // ── Processar embeds do Twitter/X ─────────────────────────────────────
-    const tweetDivs = ref.current.querySelectorAll<HTMLElement>("[data-tweet-url]");
+    const tweetDivs = container.querySelectorAll<HTMLElement>("[data-tweet-url]");
     if (tweetDivs.length > 0) {
       tweetDivs.forEach(el => {
         const url = el.getAttribute("data-tweet-url");
@@ -494,7 +543,7 @@ function ArticleBody({ bodyHtml, body }: { bodyHtml: string; body: string[] }) {
       // Carrega o script do widget ou chama render se já carregado
       const win = window as any;
       if (win.twttr?.widgets?.load) {
-        win.twttr.widgets.load(ref.current);
+        win.twttr.widgets.load(container);
       } else {
         const scriptId = "twitter-wjs";
         if (!document.getElementById(scriptId)) {
@@ -503,15 +552,54 @@ function ArticleBody({ bodyHtml, body }: { bodyHtml: string; body: string[] }) {
           s.src = "https://platform.twitter.com/widgets.js";
           s.async = true;
           s.charset = "utf-8";
-          // Quando carregar, processa os widgets na página
           s.onload = () => {
-            (window as any).twttr?.widgets?.load(ref.current!);
+            (window as any).twttr?.widgets?.load(container);
           };
           document.body.appendChild(s);
         }
       }
     }
-  }, [bodyHtml]);
+
+    // ── Processar embeds do Instagram ──────────────────────────────────────
+    const igDivs = container.querySelectorAll<HTMLElement>("[data-instagram-url]");
+    if (igDivs.length > 0) {
+      igDivs.forEach(el => {
+        const url = el.getAttribute("data-instagram-url");
+        if (!url || el.querySelector("blockquote.instagram-media")) return;
+
+        const bq = document.createElement("blockquote");
+        bq.className = "instagram-media";
+        bq.setAttribute("data-instgrm-captioned", "");
+        bq.setAttribute("data-instgrm-permalink", url);
+        bq.setAttribute("data-instgrm-version", "14");
+        bq.style.margin = "0 auto";
+
+        el.innerHTML = "";
+        el.appendChild(bq);
+      });
+
+      const win = window as any;
+      if (win.instgrm?.Embeds?.process) {
+        win.instgrm.Embeds.process();
+      } else {
+        const scriptId = "instagram-wjs";
+        if (!document.getElementById(scriptId)) {
+          const s = document.createElement("script");
+          s.id = scriptId;
+          s.src = "https://www.instagram.com/embed.js";
+          s.async = true;
+          s.onload = () => {
+            (window as any).instgrm?.Embeds?.process();
+          };
+          document.body.appendChild(s);
+        }
+      }
+    }
+
+    return () => {
+      container.removeEventListener("click", handleClick);
+    };
+  }, [bodyHtml, onImageClick]);
 
   if (bodyHtml) {
     return (
@@ -532,6 +620,7 @@ function ArticlePage() {
   const { articles, standing, nations, loading } = useSiteData();
   const navigate = useNavigate();
   const article = articles.find(a => a.slug === slug);
+  const [lightbox, setLightbox] = useState<LightboxData | null>(null);
 
   useEffect(() => { window.scrollTo({ top: 0, behavior: "smooth" }); }, [slug]);
 
@@ -567,7 +656,11 @@ function ArticlePage() {
           <span className="bread-current">{article.category.name}</span>
         </nav>
         <div className="art-hero-img">
-          <img src={article.image} alt={article.title} />
+          <img
+            src={article.image}
+            alt={article.title}
+            onClick={() => setLightbox({ src: article.image, alt: article.title })}
+          />
           <div className="art-hero-gradient" />
         </div>
         <article className="art-card">
@@ -582,7 +675,7 @@ function ArticlePage() {
               <span className="art-meta-item"><i className="bx bx-time-five" /> {readTime} min de leitura</span>
             </div>
           </header>
-          <ArticleBody bodyHtml={article.bodyHtml} body={article.body} />
+          <ArticleBody bodyHtml={article.bodyHtml} body={article.body} onImageClick={setLightbox} />
           <footer className="art-footer">
             <div className="art-tags">
               {article.tags.map(t => <span key={t} className="art-tag"><i className="bx bx-hash" />{t}</span>)}
@@ -603,6 +696,10 @@ function ArticlePage() {
         <StandingsWidget standing={standing} />
         <NationsWidget nations={nations} />
       </aside>
+
+      {lightbox && (
+        <Lightbox src={lightbox.src} alt={lightbox.alt} onClose={() => setLightbox(null)} />
+      )}
     </div>
   );
 }
@@ -745,14 +842,14 @@ export default function App() {
     <ToastProvider>
       <DataProvider>
         <Routes>
-        <Route path="/admin/*" element={<Admin />} />
-        <Route element={<Layout />}>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/eredivisie" element={<EredivisieePage />} />
-          <Route path="/selecao-holandesa" element={<SelecaoPage />} />
-          <Route path="/noticia/:slug" element={<ArticlePage />} />
-          <Route path="*" element={<HomePage />} />
-        </Route>
+          <Route path="/admin/*" element={<Admin />} />
+          <Route element={<Layout />}>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/eredivisie" element={<EredivisieePage />} />
+            <Route path="/selecao-holandesa" element={<SelecaoPage />} />
+            <Route path="/noticia/:slug" element={<ArticlePage />} />
+            <Route path="*" element={<HomePage />} />
+          </Route>
         </Routes>
       </DataProvider>
     </ToastProvider>

@@ -12,7 +12,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Underline from "@tiptap/extension-underline";
 import TextAlign from "@tiptap/extension-text-align";
-import {TextStyle} from "@tiptap/extension-text-style";
+import { TextStyle } from "@tiptap/extension-text-style";
 import Placeholder from "@tiptap/extension-placeholder";
 import Image from "@tiptap/extension-image";
 import { useEffect, useCallback, useRef, useState } from "react";
@@ -143,9 +143,58 @@ const TwitterNode = Node.create({
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
+//  EXTENSÃO: Instagram embed
+//  Salva a URL do post/reel; no site, renderiza via Instagram Embed JS
+// ═════════════════════════════════════════════════════════════════════════════
+function getInstagramUrl(input: string): string | null {
+  const m = input.match(/https?:\/\/(www\.)?instagram\.com\/(p|reel|tv)\/([A-Za-z0-9_-]+)/);
+  return m ? m[0].split("?")[0] : null;
+}
+
+const InstagramNode = Node.create({
+  name: "instagramEmbed",
+  group: "block",
+  atom: true,
+  draggable: true,
+  addAttributes() {
+    return { postUrl: { default: null } };
+  },
+  parseHTML() {
+    return [{ tag: "div[data-instagram-url]" }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return [
+      "div",
+      mergeAttributes({ "data-instagram-url": HTMLAttributes.postUrl, class: "instagram-embed-wrap" }),
+    ];
+  },
+  addNodeView() {
+    return ({ node }) => {
+      const wrap = document.createElement("div");
+      wrap.className = "instagram-embed-wrap";
+      wrap.setAttribute("data-instagram-url", node.attrs.postUrl ?? "");
+      wrap.setAttribute("contenteditable", "false");
+
+      // Preview no editor
+      wrap.innerHTML = `
+        <div class="tweet-editor-preview">
+          <div class="tweet-preview-header">
+            <i class="bx bxl-instagram" style="font-size:18px;color:#E1306C"></i>
+            <strong>Post do Instagram</strong>
+          </div>
+          <a class="tweet-preview-url" href="${node.attrs.postUrl}" target="_blank">${node.attrs.postUrl}</a>
+          <p class="tweet-preview-note">O post será carregado no site após publicar</p>
+        </div>
+      `;
+      return { dom: wrap };
+    };
+  },
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
 //  MODAL DE EMBED
 // ═════════════════════════════════════════════════════════════════════════════
-type EmbedType = "youtube" | "twitter";
+type EmbedType = "youtube" | "twitter" | "instagram";
 
 function EmbedModal({
   type, onInsert, onClose,
@@ -161,9 +210,14 @@ function EmbedModal({
     if (!v) { setError("Cole uma URL."); return; }
     if (type === "youtube") {
       if (!getYouTubeId(v)) { setError("URL do YouTube inválida. Cole o link completo do vídeo."); return; }
-    } else {
+    } else if (type === "twitter") {
       if (!getTweetUrl(v)) {
         setError("URL inválida. Copie o link do post no X/Twitter.\nEx: https://x.com/nomeuser/status/123456789");
+        return;
+      }
+    } else {
+      if (!getInstagramUrl(v)) {
+        setError("URL inválida. Copie o link do post/reel no Instagram.\nEx: https://www.instagram.com/p/ABC123DEF/");
         return;
       }
     }
@@ -176,29 +230,34 @@ function EmbedModal({
         <div className="embed-modal-head">
           {type === "youtube" ? (
             <><i className="bx bxl-youtube" style={{ color: "#ff0000", fontSize: "1.3rem" }} /> Inserir vídeo do YouTube</>
-          ) : (
+          ) : type === "twitter" ? (
             <>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
               </svg>
               Inserir post do X / Twitter
             </>
+          ) : (
+            <><i className="bx bxl-instagram" style={{ color: "#E1306C", fontSize: "1.3rem" }} /> Inserir post do Instagram</>
           )}
           <button className="embed-modal-close" onClick={onClose}><i className="bx bx-x" /></button>
         </div>
 
         <div className="embed-modal-body">
           <label className="embed-modal-label">
-            {type === "youtube" ? "Link do vídeo" : "Link do post"}
+            {type === "youtube" ? "Link do vídeo" : type === "twitter" ? "Link do post" : "Link do post/reel"}
           </label>
           <input
             ref={ref}
             className="embed-modal-input"
             value={value}
             onChange={e => { setValue(e.target.value); setError(""); }}
-            placeholder={type === "youtube"
-              ? "https://www.youtube.com/watch?v=... ou https://youtu.be/..."
-              : "https://x.com/usuario/status/123456789"
+            placeholder={
+              type === "youtube"
+                ? "https://www.youtube.com/watch?v=... ou https://youtu.be/..."
+                : type === "twitter"
+                  ? "https://x.com/usuario/status/123456789"
+                  : "https://www.instagram.com/p/ABC123DEF/"
             }
             onKeyDown={e => { if (e.key === "Enter") handleInsert(); if (e.key === "Escape") onClose(); }}
           />
@@ -213,8 +272,10 @@ function EmbedModal({
           <div className="embed-modal-hint">
             {type === "youtube" ? (
               <p>📋 Vá ao vídeo → clique em <strong>Compartilhar</strong> → <strong>Copiar link</strong></p>
-            ) : (
+            ) : type === "twitter" ? (
               <p>📋 Vá ao post → clique nos <strong>•••</strong> → <strong>Copiar link do post</strong></p>
+            ) : (
+              <p>📋 Vá ao post/reel → clique nos <strong>•••</strong> → <strong>Copiar link</strong></p>
             )}
           </div>
         </div>
@@ -288,6 +349,7 @@ export default function RichEditor({
       Image.configure({ HTMLAttributes: { class: "re-img" }, allowBase64: false }),
       YouTubeNode,
       TwitterNode,
+      InstagramNode,
     ],
     content: value,
     onUpdate: ({ editor }) => {
@@ -345,6 +407,17 @@ export default function RichEditor({
     editor.chain().focus().insertContent({
       type: "twitterEmbed",
       attrs: { tweetUrl: clean },
+    }).run();
+    setModal(null);
+  }
+
+  // Inserir post do Instagram
+  function insertInstagram(url: string) {
+    if (!editor) return;
+    const clean = getInstagramUrl(url) ?? url;
+    editor.chain().focus().insertContent({
+      type: "instagramEmbed",
+      attrs: { postUrl: clean },
     }).run();
     setModal(null);
   }
@@ -421,6 +494,9 @@ export default function RichEditor({
               <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
             </svg>
           </Btn>
+          <Btn title="Inserir post do Instagram" onClick={() => setModal("instagram")}>
+            <i className="bx bxl-instagram" style={{ color: editor.isActive("instagramEmbed") ? "#E1306C" : undefined }} />
+          </Btn>
         </div>
 
         {/* Input de arquivo oculto */}
@@ -435,6 +511,7 @@ export default function RichEditor({
       {/* Modais */}
       {modal === "youtube" && <EmbedModal type="youtube" onInsert={insertYouTube} onClose={() => setModal(null)} />}
       {modal === "twitter" && <EmbedModal type="twitter" onInsert={insertTwitter} onClose={() => setModal(null)} />}
+      {modal === "instagram" && <EmbedModal type="instagram" onInsert={insertInstagram} onClose={() => setModal(null)} />}
     </>
   );
 }

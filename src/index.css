@@ -89,7 +89,6 @@ ul, ol  { list-style: none; }
   object-fit: contain;
   border-radius: 50%;
   flex-shrink: 0;
-  /* subtle drop shadow to make circular logo pop on dark bg */
   filter: drop-shadow(0 2px 6px rgba(255,98,0,0.35));
   transition: transform 0.2s ease, filter 0.2s ease;
 }
@@ -635,9 +634,23 @@ ul, ol  { list-style: none; }
 .bread-sep    { font-size: 0.95rem; color: var(--txt3); }
 .bread-current { color: var(--txt3); font-weight: 500; }
 
-.art-hero-img { position: relative; border-radius: var(--r-xl); overflow: hidden; height: 340px; margin-bottom: 1.25rem; background: var(--dark-3); }
-.art-hero-img img { width: 100%; height: 100%; object-fit: cover; }
-.art-hero-gradient { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.4) 0%, transparent 60%); }
+/* Imagem de capa do artigo — proporção travada (677x395, ~1.71:1) para ficar mais "quadrada" */
+.art-hero-img {
+  position: relative;
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  aspect-ratio: 677 / 395;
+  margin-bottom: 1.25rem;
+  background: var(--dark-3);
+}
+.art-hero-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  cursor: zoom-in;
+}
+.art-hero-gradient { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.4) 0%, transparent 60%); pointer-events: none; }
 
 .art-card { background: var(--surface); border-radius: var(--r-xl); overflow: hidden; box-shadow: var(--shadow-s); border: 1px solid var(--border); padding: 2rem 2.25rem; }
 .art-header { margin-bottom: 1.75rem; border-bottom: 1px solid var(--border); padding-bottom: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem; }
@@ -655,9 +668,18 @@ ul, ol  { list-style: none; }
 .art-meta-row { display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; }
 .art-meta-item { display: flex; align-items: center; gap: 0.35rem; font-size: 0.78rem; color: var(--txt3); font-weight: 500; }
 .art-meta-item i { font-size: 0.92rem; color: var(--orange); }
-.art-body { display: flex; flex-direction: column; gap: 1.1rem; }
-.art-body p { font-size: 0.97rem; line-height: 1.82; color: var(--txt2); }
-.art-body p:first-child { font-size: 1.05rem; font-weight: 500; color: var(--txt1); }
+
+/* Corpo do artigo — bloco normal, sem flex/gap (o gap não chegava aos <p> reais
+   quando o conteúdo vinha do editor rico, pois eles ficam numa div aninhada) */
+.art-body { display: block; }
+.art-body p {
+  font-size: 0.97rem;
+  line-height: 1.82;
+  color: var(--txt2);
+  margin: 0 0 1.15em;
+}
+.art-body p:last-child { margin-bottom: 0; }
+
 .art-footer { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
 .art-tags { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .art-tag { display: inline-flex; align-items: center; gap: 0.2rem; font-size: 0.72rem; font-weight: 600; color: var(--orange); background: var(--orange-light); padding: 4px 10px; border-radius: 20px; border: 1px solid rgba(255,98,0,0.2); }
@@ -750,7 +772,6 @@ ul, ol  { list-style: none; }
   .conv-grid { grid-template-columns: 1fr; }
   .art-card  { padding: 1.5rem; }
   .art-title { font-size: 1.4rem; }
-  .art-hero-img { height: 240px; }
 }
 @media (max-width: 600px) {
   .sidebar { grid-template-columns: 1fr; }
@@ -794,7 +815,7 @@ ul, ol  { list-style: none; }
   .hero-small   { border-radius: var(--r-lg); }
   .news-card    { border-radius: var(--r-md); }
   .widget       { border-radius: var(--r-md); }
-  .art-hero-img { height: 160px; border-radius: var(--r-lg); }
+  .art-hero-img { border-radius: var(--r-lg); }
   .art-card     { padding: 0.9rem; border-radius: var(--r-lg); }
   .art-title    { font-size: 1.1rem; }
   .art-body p   { font-size: 0.88rem; }
@@ -1495,8 +1516,9 @@ ul, ol  { list-style: none; }
 .sk-wr-pts  { width: 26px;  height: 13px; border-radius: 3px; flex-shrink: 0; }
 
 /* ── Skeleton da página de artigo ────────────────────────────────────────── */
+/* Proporção travada igual à imagem real (677x395) — evita "pulo" de layout ao carregar */
 .sk-art-hero {
-  height: 340px;
+  aspect-ratio: 677 / 395;
   border-radius: var(--r-xl);
   overflow: hidden;
   margin-bottom: 1.5rem;
@@ -1604,7 +1626,6 @@ ul, ol  { list-style: none; }
   position: relative;
   overflow: hidden;
 }
-/* subtle radial glow behind the card */
 .login-root::before {
   content: "";
   position: absolute;
@@ -1660,7 +1681,6 @@ ul, ol  { list-style: none; }
 
 .login-form { display: flex; flex-direction: column; gap: 1rem; }
 
-/* Override adm-field colors for dark bg */
 .login-form .adm-field label { color: rgba(255,255,255,0.7); }
 
 .login-input-wrap {
@@ -2238,6 +2258,9 @@ ul, ol  { list-style: none; }
 }
 .art-body hr { border: none; border-top: 2px solid var(--border); margin: 2em 0; }
 
+/* Imagens inseridas no corpo do artigo (via editor rico) — clicáveis para o lightbox */
+.art-body .re-img { cursor: zoom-in; border-radius: var(--r-md); margin: 0.5em 0; }
+
 /* ── Seletor de origem de imagem ─────────────────────────────────────────── */
 .img-source-tabs {
   display: flex;
@@ -2268,6 +2291,39 @@ ul, ol  { list-style: none; }
   color: #fff !important;
 }
 .img-source-active i { color: #fff; }
+
+/* ── Área de upload de imagem (seletor "Upload") ─────────────────────────── */
+.img-upload-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--border);
+  border-radius: var(--r-md);
+  padding: 1.25rem 1rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  background: var(--surface2);
+}
+.img-upload-area:hover { border-color: var(--orange); background: var(--orange-light); }
+.img-upload-placeholder,
+.img-upload-loading,
+.img-upload-done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  text-align: center;
+  color: var(--txt3);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.img-upload-placeholder i { font-size: 1.8rem; color: var(--txt3); }
+.img-upload-placeholder small { font-size: 0.68rem; font-weight: 500; color: var(--txt3); }
+.img-upload-loading { color: var(--orange); flex-direction: row; gap: 0.5rem; }
+.img-upload-loading i { font-size: 1.1rem; }
+.img-upload-done { color: var(--green); flex-direction: row; gap: 0.5rem; font-weight: 600; }
+.img-upload-done i { font-size: 1.2rem; }
+
 /* ── Editor expandido (lateral) ──────────────────────────────────────────── */
 .adm-form-col-hidden {
   display: none !important;
@@ -2306,6 +2362,67 @@ ul, ol  { list-style: none; }
   border-color: var(--orange);
   background: var(--orange-light);
 }
+
+/* ── Embeds inseridos pelo editor (YouTube / Twitter / Instagram) ─────────── */
+.yt-embed-wrap {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: #000;
+  margin: 0.75em 0;
+}
+.yt-embed-iframe { width: 100%; height: 100%; border: none; display: block; }
+.yt-embed-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: rgba(255,0,0,0.85);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.tweet-embed-wrap,
+.instagram-embed-wrap {
+  margin: 0.9em 0;
+  display: flex;
+  justify-content: center;
+}
+.tweet-editor-preview {
+  width: 100%;
+  max-width: 420px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface2);
+  padding: 0.9rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.tweet-preview-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--txt1);
+}
+.tweet-preview-url {
+  font-size: 0.78rem;
+  color: var(--orange);
+  word-break: break-all;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.tweet-preview-note {
+  font-size: 0.7rem;
+  color: var(--txt3);
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    FH-TOAST — Notificações nativas (prefixo fh- sem conflito)
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -2387,7 +2504,56 @@ ul, ol  { list-style: none; }
   .fh-toast-container { top: auto; bottom: 0.75rem; right: 0.75rem; left: 0.75rem; width: auto; }
 }
 
-.bx {
-  width: max-content !important;
-  height: max-content !important;
+/* ═══════════════════════════════════════════════════════════════════════════
+   LIGHTBOX — modal de visualização de imagem
+   ═══════════════════════════════════════════════════════════════════════════ */
+.lightbox-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999999;
+  padding: 2rem;
+  cursor: zoom-out;
+  animation: fadeIn 0.2s ease;
 }
+.lightbox-img {
+  max-width: 100%;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-xl);
+  cursor: default;
+  animation: fadeUp 0.25s ease both;
+}
+.lightbox-close {
+  position: fixed;
+  top: 1.25rem;
+  right: 1.5rem;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: #fff;
+  font-size: 1.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.lightbox-close:hover { background: rgba(255,255,255,0.2); }
+
+@media (max-width: 480px) {
+  .lightbox-backdrop { padding: 1rem; }
+  .lightbox-close { top: 0.75rem; right: 0.75rem; width: 38px; height: 38px; font-size: 1.35rem; }
+}
+
+/* ── Ícones (Boxicons) — regra de largura/altura genérica removida.
+   Ícones que "somem" dentro de flex/grid devem usar flex-shrink:0 no
+   próprio contexto (já aplicado nas classes .hero-meta i, .fx-comp i,
+   .conv-group li i, etc.), em vez de uma regra global com !important
+   que distorcia ícones em outros lugares do site. */
