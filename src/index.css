@@ -375,6 +375,9 @@ ul, ol  { list-style: none; }
 }
 .hero-large .hero-body { padding: 1.2rem 1.4rem 1.3rem; }
 
+/* Vários badges de categoria empilhados no hero (antes era um span único) */
+.hero-badges { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+
 /* ── Typography ─────────────────────────────────────────────────────────────── */
 .hero-title {
   font-family: var(--font-display);
@@ -472,7 +475,7 @@ ul, ol  { list-style: none; }
   align-items: center;
   gap: 0.35rem;
 }
-.cat-text  { color: var(--orange); }
+.cat-text  { color: var(--orange); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .dot       { color: var(--txt3); }
 .club-text { color: var(--txt3); }
 .news-title {
@@ -1945,6 +1948,32 @@ ul, ol  { list-style: none; }
   flex-direction: column;
   gap: 0.35rem;
 }
+
+/* ── Seletor múltiplo de categorias (chips) no formulário de artigo ───────── */
+.cat-multiselect {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.cat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.4rem 0.75rem;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--txt2);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s, transform 0.1s;
+}
+.cat-chip:hover { border-color: var(--orange); color: var(--orange); }
+.cat-chip:active { transform: scale(0.97); }
+.cat-chip-active { color: #fff !important; }
+.cat-chip-active:hover { color: #fff !important; opacity: 0.9; }
+.cat-chip i { font-size: 0.9rem; }
 .cat-new-btn {
   align-self: flex-end;
   white-space: nowrap;

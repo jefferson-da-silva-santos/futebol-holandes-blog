@@ -167,13 +167,13 @@ function ArticleForm({ initial, categories, onSave, onCancel, saving }: {
           : legacyBodyToHtml(initial.body ?? []),
         imageSource: "url" as const,
         published: initial.published, featured: initial.featured ?? false,
-        categoryId: initial.category.id,
+        categoryIds: initial.categories.map(c => c.id),
       }
       : {
         title: "", meta: "", date: "", image: "", icon: "bx bxs-trophy", club: "",
         tags: [], body: [], bodyHtml: "",
         imageSource: "url" as const,
-        published: true, featured: false, categoryId: categories[0]?.id ?? 0,
+        published: true, featured: false, categoryIds: categories[0] ? [categories[0].id] : [],
       }
   );
   const [tagInput, setTagInput] = useState(initial?.tags.join(", ") ?? "");
@@ -192,7 +192,7 @@ function ArticleForm({ initial, categories, onSave, onCancel, saving }: {
     if (!form.date.trim()) e.date = "Obrigatório";
     if (!form.meta.trim()) e.meta = "Obrigatório";
     if (!form.image.trim()) e.image = "Obrigatório";
-    if (!form.categoryId) e.cat = "Selecione uma categoria";
+    if (!form.categoryIds || form.categoryIds.length === 0) e.cat = "Selecione ao menos uma categoria";
     if (!form.bodyHtml || form.bodyHtml === "<p></p>" || form.bodyHtml.trim() === "")
       e.body = "Escreva o conteúdo do artigo";
     return e;
@@ -263,10 +263,29 @@ function ArticleForm({ initial, categories, onSave, onCancel, saving }: {
 
           <div className="adm-row-2">
             <div className={`adm-field ${errors.cat ? "has-error" : ""}`}>
-              <label>Categoria <span className="req">*</span></label>
-              <select value={form.categoryId} onChange={e => set("categoryId", parseInt(e.target.value))}>
-                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              <label>Categorias <span className="req">*</span></label>
+              <div className="cat-multiselect">
+                {categories.map(c => {
+                  const selected = form.categoryIds.includes(c.id);
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      className={`cat-chip ${selected ? "cat-chip-active" : ""}`}
+                      style={selected ? { background: c.color, borderColor: c.color } : undefined}
+                      onClick={() => {
+                        const next = selected
+                          ? form.categoryIds.filter(id => id !== c.id)
+                          : [...form.categoryIds, c.id];
+                        set("categoryIds", next);
+                      }}
+                    >
+                      {selected && <i className="bx bx-check" />}
+                      {c.name}
+                    </button>
+                  );
+                })}
+              </div>
               {errors.cat && <span className="field-err">{errors.cat}</span>}
             </div>
             <div className="adm-field">
@@ -457,7 +476,9 @@ function ArticleRow({ article, onEdit, onDelete, onToggle, onFeature }: {
       </div>
       <div className="adm-row-info">
         <div className="adm-row-meta">
-          <span className={`badge ${article.category.badgeClass}`} style={{ background: article.category.color }}>{article.category.name}</span>
+          {article.categories.map(cat => (
+            <span key={cat.id} className={`badge ${cat.badgeClass}`} style={{ background: cat.color }}>{cat.name}</span>
+          ))}
           {article.club && <span className="badge badge-grey">{article.club}</span>}
           {!article.published && <span className="badge adm-badge-draft">Rascunho</span>}
           <span className="adm-row-date"><i className="bx bx-calendar" /> {article.date}</span>
@@ -1067,7 +1088,7 @@ function CategoriesSection({ articles, categories, setCategories }: {
     finally { setSaving(false); }
   }
   async function handleDelete(id: number, name: string) {
-    if (articles.filter(a => a.category.id === id).length > 0) { showNotyf("error", `"${name}" possui artigos vinculados.`); return; }
+    if (articles.filter(a => a.categories.some(cat => cat.id === id)).length > 0) { showNotyf("error", `"${name}" possui artigos vinculados.`); return; }
     setDeletingId(id);
     try { await categoriesApi.delete(id); setCategories(p => p.filter(c => c.id !== id)); showNotyf("success", `"${name}" excluída.`); }
     catch (err: any) { showNotyf("error", err.message); }
@@ -1099,7 +1120,7 @@ function CategoriesSection({ articles, categories, setCategories }: {
           {categories.map(c => (
             <div key={c.id} className="cat-row">
               <span className="badge" style={{ background: c.color || "#FF6200" }}>{c.name}</span>
-              <span className="cat-row-count">{articles.filter(a => a.category.id === c.id).length} artigo(s)</span>
+              <span className="cat-row-count">{articles.filter(a => a.categories.some(cat => cat.id === c.id)).length} artigo(s)</span>
               <button className="adm-action-btn" onClick={() => setEditingColorId(editingColorId === c.id ? null : c.id)} title="Editar cor">
                 <i className="bx bx-palette" />
               </button>
@@ -1175,7 +1196,7 @@ function AdminPanel({ user, onLogout, onExit }: { user: AdminUser; onLogout: () 
   }
 
   const filtered = articles.filter(a => {
-    const mc = filterCat === "Todas" || a.category.name === filterCat;
+    const mc = filterCat === "Todas" || a.categories.some(cat => cat.name === filterCat);
     const ms = a.title.toLowerCase().includes(search.toLowerCase());
     return mc && ms;
   });
@@ -1323,8 +1344,5 @@ export default function Admin() {
 
   if (checking) return <div className="login-root"><div className="adm-loading"><i className="bx bx-loader-alt bx-spin adm-loading-icon" /><p>Verificando sessão...</p></div></div>;
   if (!user) return <LoginScreen onLogin={u => setUser(u)} />;
-  return <AdminPanel user={user} onLogout={() => { authApi.logout(); setUser(null); }} onExit={() => {
-    navigate("/");
-    window.location.reload();
-  }} />;
+  return <AdminPanel user={user} onLogout={() => { authApi.logout(); setUser(null); }} onExit={() => navigate("/")} />;
 }

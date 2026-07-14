@@ -181,7 +181,7 @@ function ArticleCard({ article, onClick }: { article: Article; onClick: () => vo
       <div className="news-thumb"><img src={article.image} alt={article.title} className="thumb-img" /></div>
       <div className="news-info">
         <p className="news-cat">
-          <span className="cat-text">{article.category.name}</span>
+          <span className="cat-text">{article.categories.map(c => c.name).join(" · ")}</span>
           {article.club && <><span className="dot">·</span><span className="club-text">{article.club}</span></>}
         </p>
         <h3 className="news-title">{article.title}</h3>
@@ -197,7 +197,11 @@ function HeroCard({ article, size, onClick }: { article: Article; size: "large" 
       <img src={article.image} alt={article.title} className="hero-img" />
       <div className="hero-overlay" />
       <div className="hero-body">
-        <span className={`badge ${article.category.badgeClass}`} style={{ background: article.category.color }}>{article.category.name}</span>
+        <div className="hero-badges">
+          {article.categories.map(cat => (
+            <span key={cat.id} className={`badge ${cat.badgeClass}`} style={{ background: cat.color }}>{cat.name}</span>
+          ))}
+        </div>
         {size === "large"
           ? <h2 className="hero-title">{article.title}</h2>
           : <h3 className="hero-sub-title">{article.title}</h3>}
@@ -383,7 +387,7 @@ function EredivisieePage() {
   const navigate = useNavigate();
   if (loading) return <PageSkeleton variant="eredivisie" />;
 
-  const news = articles.filter(a => a.category.name === "Eredivisie" && a.published);
+  const news = articles.filter(a => a.categories.some(c => c.name === "Eredivisie") && a.published);
   const openArticle = (slug: string) => navigate(`/noticia/${slug}`);
 
   return (
@@ -438,7 +442,7 @@ function SelecaoPage() {
   const navigate = useNavigate();
   if (loading) return <PageSkeleton variant="selecao" />;
 
-  const news = articles.filter(a => a.category.name === "Seleção Holandesa" && a.published);
+  const news = articles.filter(a => a.categories.some(c => c.name === "Seleção Holandesa") && a.published);
   const openArticle = (slug: string) => navigate(`/noticia/${slug}`);
 
   return (
@@ -640,7 +644,9 @@ function ArticlePage() {
     );
   }
 
-  const related = articles.filter(a => a.id !== article.id && a.category.id === article.category.id).slice(0, 2);
+  const related = articles.filter(a =>
+    a.id !== article.id && a.categories.some(c => article.categories.some(ac => ac.id === c.id))
+  ).slice(0, 2);
   // bodyHtml para novos artigos, body legado para artigos antigos
   const rawText = article.bodyHtml
     ? article.bodyHtml.replace(/<[^>]+>/g, " ")
@@ -653,7 +659,7 @@ function ArticlePage() {
         <nav className="breadcrumb">
           <button className="bread-link" onClick={() => navigate("/")}><i className="bx bx-home-alt" /> Início</button>
           <i className="bx bx-chevron-right bread-sep" />
-          <span className="bread-current">{article.category.name}</span>
+          <span className="bread-current">{article.categories.map(c => c.name).join(" · ")}</span>
         </nav>
         <div className="art-hero-img">
           <img
@@ -666,7 +672,9 @@ function ArticlePage() {
         <article className="art-card">
           <header className="art-header">
             <div className="art-badges">
-              <span className={`badge ${article.category.badgeClass}`} style={{ background: article.category.color }}>{article.category.name}</span>
+              {article.categories.map(cat => (
+                <span key={cat.id} className={`badge ${cat.badgeClass}`} style={{ background: cat.color }}>{cat.name}</span>
+              ))}
               {article.club && <span className="badge badge-grey">{article.club}</span>}
             </div>
             <h1 className="art-title">{article.title}</h1>

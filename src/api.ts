@@ -32,14 +32,17 @@ export interface Article {
   image: string; icon: string; club?: string | null; tags: string[]; body: string[];
   bodyHtml: string;
   published: boolean; featured: boolean; createdAt: string; updatedAt: string;
-  category: Category; catClass?: string;
+  // Um artigo agora pode pertencer a múltiplas categorias
+  categories: Category[]; catClass?: string;
 }
 export interface ArticleInput {
   title: string; meta: string; date: string; image: string;
   imageSource?: "url" | "drive" | "upload";
   icon?: string; club?: string; tags?: string[];
   body?: string[]; bodyHtml?: string;
-  published?: boolean; featured?: boolean; categoryId: number;
+  published?: boolean; featured?: boolean;
+  // Lista de IDs de categoria (mínimo 1)
+  categoryIds: number[];
 }
 
 // ─── Upload API ───────────────────────────────────────────────────────────────
@@ -232,5 +235,5 @@ export function seedDatabase() { return request<{ message: string }>("/seed", { 
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 export function normalizeArticle(a: Article): Article {
-  return { ...a, catClass: a.category.badgeClass };
+  return { ...a, catClass: a.categories?.[0]?.badgeClass };
 }
