@@ -26,7 +26,8 @@ export class AuthError extends Error { }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface AdminUser { id: number; name: string; email: string; lastLoginAt?: string; }
-export interface Category { id: number; name: string; badgeClass: string; color: string; _count?: { articles: number }; }
+export interface Category { id: number; name: string; slug: string; badgeClass: string; color: string; _count?: { articles: number }; }
+export interface Tag { id: number; name: string; slug: string; _count?: { articles: number }; }
 export interface Article {
   id: number; title: string; slug: string; meta: string; date: string;
   image: string; icon: string; club?: string | null; tags: string[]; body: string[];
@@ -34,11 +35,15 @@ export interface Article {
   published: boolean; featured: boolean; createdAt: string; updatedAt: string;
   // Um artigo agora pode pertencer a múltiplas categorias
   categories: Category[]; catClass?: string;
+  // Tags reais (com slug, para virarem link) — `tags` acima é mantido como legado
+  tagRelations: Tag[];
 }
 export interface ArticleInput {
   title: string; meta: string; date: string; image: string;
   imageSource?: "url" | "drive" | "upload";
-  icon?: string; club?: string; tags?: string[];
+  icon?: string; club?: string;
+  // Nomes de tags digitados no TagsInput — o back-end cria a tag na hora se não existir
+  tagNames?: string[];
   body?: string[]; bodyHtml?: string;
   published?: boolean; featured?: boolean;
   // Lista de IDs de categoria (mínimo 1)
@@ -143,9 +148,10 @@ export const authApi = {
 
 // ─── Articles API ─────────────────────────────────────────────────────────────
 export const articlesApi = {
-  list(params?: { category?: string; published?: boolean; featured?: boolean; search?: string; page?: number; limit?: number }) {
+  list(params?: { category?: string; tag?: string; published?: boolean; featured?: boolean; search?: string; page?: number; limit?: number }) {
     const q = new URLSearchParams();
     if (params?.category) q.set("category", params.category);
+    if (params?.tag) q.set("tag", params.tag);
     if (params?.published !== undefined) q.set("published", String(params.published));
     if (params?.featured !== undefined) q.set("featured", String(params.featured));
     if (params?.search) q.set("search", params.search);
@@ -171,6 +177,17 @@ export const categoriesApi = {
     return request<Category>(`/categories/${id}`, { method: "PATCH", body: JSON.stringify(data) });
   },
   delete(id: number) { return request<{ deleted: boolean }>(`/categories/${id}`, { method: "DELETE" }); },
+};
+
+// ─── Tags API ─────────────────────────────────────────────────────────────────
+export const tagsApi = {
+  search(query: string) {
+    const q = new URLSearchParams({ search: query });
+    return request<Tag[]>(`/tags?${q.toString()}`);
+  },
+  list() { return request<Tag[]>("/tags"); },
+  create(name: string) { return request<Tag>("/tags", { method: "POST", body: JSON.stringify({ name }) }); },
+  delete(id: number) { return request<{ deleted: boolean }>(`/tags/${id}`, { method: "DELETE" }); },
 };
 
 // ─── Standings API ────────────────────────────────────────────────────────────

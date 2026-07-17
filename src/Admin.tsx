@@ -4,6 +4,7 @@ import { showNotyf } from "./utils/notifier";
 import { useLocalStorage } from "./hooks/useLocalStorage";
 import ColorPicker from "./components/ColorPicker";
 import RichEditor from "./components/RichEditorProps";
+import TagsInput from "./components/TagsInput";
 import {
   authApi, articlesApi, categoriesApi, standingsApi, convocationApi,
   fixturesApi, nationsApi, scorersApi, configApi, menuApi, uploadApi, normalizeArticle, auth,
@@ -11,6 +12,8 @@ import {
   type StandingEntry, type Fixture,
   type NationsEntry, type SiteConfig, type MenuItem, type MenuItemInput,
 } from "./api";
+
+const SITE_BASE_URL = "https://futebolholandes.blog.br"; // usado para exibir o link público de categorias/tags
 
 // ─── Migração de conteúdo legado ──────────────────────────────────────────────
 // Artigos antigos guardam o texto em `body` (array de parágrafos simples),
@@ -148,6 +151,40 @@ function ChangePasswordModal({ onClose, onSuccess }: { onClose: () => void; onSu
   );
 }
 
+// ─── Category Checklist ────────────────────────────────────────────────────────
+// Lista de categorias com campo de busca e checkbox — usada no formulário de
+// artigo no lugar das "pills" soltas, para não ficar gigante com muitas categorias.
+function CategoryChecklist({ categories, selectedIds, onChange }: {
+  categories: Category[]; selectedIds: number[]; onChange: (ids: number[]) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const filtered = categories.filter(c => c.name.toLowerCase().includes(query.toLowerCase()));
+
+  function toggle(id: number) {
+    onChange(selectedIds.includes(id) ? selectedIds.filter(i => i !== id) : [...selectedIds, id]);
+  }
+
+  return (
+    <div className="cat-checklist-wrap">
+      <div className="cat-checklist-search">
+        <i className="bx bx-search" />
+        <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar categoria..." />
+        <span className="cat-checklist-count">{selectedIds.length} selecionada(s)</span>
+      </div>
+      <div className="cat-checklist-list">
+        {filtered.length === 0 && <p className="cat-checklist-empty">Nenhuma categoria encontrada.</p>}
+        {filtered.map(c => (
+          <label key={c.id} className="cat-check-row">
+            <input type="checkbox" checked={selectedIds.includes(c.id)} onChange={() => toggle(c.id)} />
+            <span className="cat-check-dot" style={{ background: c.color }} />
+            <span className="cat-check-name">{c.name}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Article Form ─────────────────────────────────────────────────────────────
 function ArticleForm({ initial, categories, onSave, onCancel, saving }: {
   initial?: Article; categories: Category[];
@@ -158,7 +195,7 @@ function ArticleForm({ initial, categories, onSave, onCancel, saving }: {
     initial
       ? {
         title: initial.title, meta: initial.meta, date: initial.date, image: initial.image,
-        icon: initial.icon, club: initial.club ?? "", tags: initial.tags,
+        icon: initial.icon, club: initial.club ?? "",
         body: initial.body,
         // Se bodyHtml estiver vazio mas houver conteúdo legado em body[], migra para HTML
         // para que o texto apareça no editor em vez de abrir em branco.
@@ -171,12 +208,12 @@ function ArticleForm({ initial, categories, onSave, onCancel, saving }: {
       }
       : {
         title: "", meta: "", date: "", image: "", icon: "bx bxs-trophy", club: "",
-        tags: [], body: [], bodyHtml: "",
+        body: [], bodyHtml: "",
         imageSource: "url" as const,
         published: true, featured: false, categoryIds: categories[0] ? [categories[0].id] : [],
       }
   );
-  const [tagInput, setTagInput] = useState(initial?.tags.join(", ") ?? "");
+  const [tags, setTags] = useState<string[]>(initial?.tagRelations?.map(t => t.name) ?? initial?.tags ?? []);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [editorExpanded, setEditorExpanded] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
@@ -212,7 +249,7 @@ function ArticleForm({ initial, categories, onSave, onCancel, saving }: {
       console.log("[DEBUG] validação passou, chamando onSave..."); // TEMPORÁRIO
       await onSave({
         ...form,
-        tags: tagInput.split(",").map(t => t.trim()).filter(Boolean),
+        tagNames: tags,
       });
       console.log("[DEBUG] onSave concluído sem erro."); // TEMPORÁRIO
     } catch (err: any) {
@@ -278,28 +315,11 @@ function ArticleForm({ initial, categories, onSave, onCancel, saving }: {
           <div className="adm-row-2">
             <div className={`adm-field ${errors.cat ? "has-error" : ""}`}>
               <label>Categorias <span className="req">*</span></label>
-              <div className="cat-multiselect">
-                {categories.map(c => {
-                  const selected = form.categoryIds.includes(c.id);
-                  return (
-                    <button
-                      key={c.id}
-                      type="button"
-                      className={`cat-chip ${selected ? "cat-chip-active" : ""}`}
-                      style={selected ? { background: c.color, borderColor: c.color } : undefined}
-                      onClick={() => {
-                        const next = selected
-                          ? form.categoryIds.filter(id => id !== c.id)
-                          : [...form.categoryIds, c.id];
-                        set("categoryIds", next);
-                      }}
-                    >
-                      {selected && <i className="bx bx-check" />}
-                      {c.name}
-                    </button>
-                  );
-                })}
-              </div>
+              <CategoryChecklist
+                categories={categories}
+                selectedIds={form.categoryIds}
+                onChange={ids => set("categoryIds", ids)}
+              />
               {errors.cat && <span className="field-err">{errors.cat}</span>}
             </div>
             <div className="adm-field">
@@ -417,8 +437,8 @@ function ArticleForm({ initial, categories, onSave, onCancel, saving }: {
               </div>
             </div>
             <div className="adm-field">
-              <label>Tags (vírgula)</label>
-              <input value={tagInput} onChange={e => setTagInput(e.target.value)} placeholder="PSV, Eredivisie..." />
+              <label>Tags</label>
+              <TagsInput value={tags} onChange={setTags} />
             </div>
           </div>
 
@@ -1134,6 +1154,17 @@ function CategoriesSection({ articles, categories, setCategories }: {
           {categories.map(c => (
             <div key={c.id} className="cat-row">
               <span className="badge" style={{ background: c.color || "#FF6200" }}>{c.name}</span>
+              <button
+                type="button"
+                className="cat-row-link"
+                title="Copiar link"
+                onClick={() => {
+                  navigator.clipboard.writeText(`${SITE_BASE_URL}/${c.slug}`);
+                  showNotyf("success", "Link copiado!");
+                }}
+              >
+                <i className="bx bx-link" /> /{c.slug}
+              </button>
               <span className="cat-row-count">{articles.filter(a => a.categories.some(cat => cat.id === c.id)).length} artigo(s)</span>
               <button className="adm-action-btn" onClick={() => setEditingColorId(editingColorId === c.id ? null : c.id)} title="Editar cor">
                 <i className="bx bx-palette" />
@@ -1147,6 +1178,9 @@ function CategoriesSection({ articles, categories, setCategories }: {
             </div>
           ))}
         </div>
+        <p className="cat-checklist-empty" style={{ textAlign: "left", padding: "0.5rem 0 0" }}>
+          <i className="bx bx-info-circle" /> Renomear uma categoria muda o link público (o slug é gerado a partir do nome).
+        </p>
       </div>
     </div>
   );
