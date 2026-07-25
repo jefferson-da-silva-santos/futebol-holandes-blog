@@ -941,8 +941,8 @@ function draftFromItem(it: MenuItem): MenuItemDraft {
 
 // Seletor de rota: dropdown com as páginas do site + opção "Link externo" que revela um campo de URL
 function RoutePicker({ value, onChange, size = "normal" }: { value: string; onChange: (v: string) => void; size?: "normal" | "small" }) {
-  const isKnown = SITE_ROUTES.some(r => r.path === value);
-  const isExternal = !isKnown && value !== "";
+  // Externo = começa com http/https, não depende de estar na lista
+  const isExternal = /^https?:\/\//.test(value);
   const selectValue = isExternal ? EXTERNAL_VALUE : (value || "");
   const fontSize = size === "small" ? "0.76rem" : "0.8rem";
   const padding = size === "small" ? "0.32rem 0.55rem" : "0.4rem 0.6rem";
