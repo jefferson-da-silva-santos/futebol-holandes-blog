@@ -181,6 +181,7 @@ ul, ol  { list-style: none; }
   animation: fadeSlideDown 0.18s ease;
   z-index: 999;
 }
+.dropdown a,
 .dropdown button {
   display: flex;
   align-items: center;
@@ -190,13 +191,16 @@ ul, ol  { list-style: none; }
   padding: 0.7rem 1.1rem;
   font-size: 0.82rem;
   font-weight: 500;
-  color: rgba(255,255,255,0.8);
+  color: rgba(255,255,255,0.85);
   border-bottom: 1px solid var(--border-dark);
   transition: background 0.12s, color 0.12s;
 }
+.dropdown a:last-child,
 .dropdown button:last-child { border-bottom: none; }
-.dropdown button:hover { background: rgba(255,255,255,0.07); color: #fff; }
-.dropdown button i { font-size: 1rem; color: var(--orange); }
+.dropdown a:hover,
+.dropdown button:hover { background: rgba(255,255,255,0.10); color: #fff; }
+.dropdown a i,
+.dropdown button i { font-size: 1rem; color: var(--orange); flex-shrink: 0; }
 @keyframes fadeSlideDown {
   from { opacity:0; transform: translateY(-8px); }
   to   { opacity:1; transform: translateY(0); }

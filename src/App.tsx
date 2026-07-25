@@ -180,10 +180,6 @@ function ArticleCard({ article, onClick }: { article: Article; onClick: () => vo
     <article className="news-card" onClick={onClick} role="button" tabIndex={0} onKeyDown={e => e.key === "Enter" && onClick()}>
       <div className="news-thumb"><img src={article.image} alt={article.title} className="thumb-img" /></div>
       <div className="news-info">
-        <p className="news-cat">
-          <span className="cat-text">{article.categories.map(c => c.name).join(" · ")}</span>
-          {article.club && <><span className="dot">·</span><span className="club-text">{article.club}</span></>}
-        </p>
         <h3 className="news-title">{article.title}</h3>
         <p className="news-date"><i className="bx bx-calendar" /> {article.date}</p>
       </div>
@@ -714,6 +710,59 @@ function ArticlePage() {
 // ═════════════════════════════════════════════════════════════════════════════
 //  LAYOUT (topbar + navbar + footer compartilhados)
 // ═════════════════════════════════════════════════════════════════════════════
+function CategoryPage() {
+  const { categorySlug } = useParams<{ categorySlug: string }>();
+  const { articles, standing, nations, loading } = useSiteData();
+  const navigate = useNavigate();
+
+  if (loading) return <PageSkeleton />;
+
+  // Decodifica o slug da URL e filtra artigos por nome de categoria
+  const categoryName = decodeURIComponent(categorySlug ?? "").replace(/-/g, " ");
+  const filtered = articles.filter(a =>
+    a.published && a.categories.some(c =>
+      c.name.toLowerCase() === categoryName.toLowerCase() ||
+      c.name.toLowerCase().replace(/\s+/g, "-") === (categorySlug ?? "").toLowerCase()
+    )
+  );
+
+  // Tenta pegar o nome real da categoria do primeiro artigo
+  const realName = filtered[0]?.categories.find(c =>
+    c.name.toLowerCase().replace(/\s+/g, "-") === (categorySlug ?? "").toLowerCase() ||
+    c.name.toLowerCase() === categoryName.toLowerCase()
+  )?.name ?? categoryName;
+
+  const openArticle = (slug: string) => navigate(`/noticia/${slug}`);
+
+  return (
+    <div className="layout-grid">
+      <main className="main">
+        <section className="page-section">
+          <div className="sec-head">
+            <span className="sec-label">
+              <i className="bx bx-purchase-tag" /> {realName}
+            </span>
+          </div>
+          {filtered.length > 0 ? (
+            <div className="news-grid">
+              {filtered.map(n => <ArticleCard key={n.id} article={n} onClick={() => openArticle(n.slug)} />)}
+            </div>
+          ) : (
+            <div className="empty-state">
+              <i className="bx bx-news" />
+              <p>Nenhuma notícia encontrada para esta categoria.</p>
+            </div>
+          )}
+        </section>
+      </main>
+      <aside className="sidebar">
+        <StandingsWidget standing={standing} />
+        <NationsWidget nations={nations} />
+      </aside>
+    </div>
+  );
+}
+
 function Layout() {
   const { config, menu } = useSiteData();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -855,6 +904,7 @@ export default function App() {
             <Route path="/eredivisie" element={<EredivisieePage />} />
             <Route path="/selecao-holandesa" element={<SelecaoPage />} />
             <Route path="/noticia/:slug" element={<ArticlePage />} />
+            <Route path="/categoria/:categorySlug" element={<CategoryPage />} />
             <Route path="*" element={<HomePage />} />
           </Route>
         </Routes>

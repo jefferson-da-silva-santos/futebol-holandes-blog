@@ -921,11 +921,13 @@ function ConfigSection() {
 
 // ─── Menu Section ──────────────────────────────────────────────────────────────
 // Rotas reais existentes no site (App.tsx) — o usuário escolhe entre elas
-const SITE_ROUTES: { path: string; label: string }[] = [
+const BASE_ROUTES: { path: string; label: string }[] = [
   { path: "/", label: "Início (/)" },
   { path: "/eredivisie", label: "Eredivisie (/eredivisie)" },
   { path: "/selecao-holandesa", label: "Seleção Holandesa (/selecao-holandesa)" },
 ];
+// SITE_ROUTES é construído dinamicamente no MenuSection com as categorias do banco
+let SITE_ROUTES: { path: string; label: string }[] = [...BASE_ROUTES];
 const EXTERNAL_VALUE = "__external__";
 
 type MenuItemDraft = { label: string; icon: string; path: string; active: boolean; children: MenuItemDraft[] };
