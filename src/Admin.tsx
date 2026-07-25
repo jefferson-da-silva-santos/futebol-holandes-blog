@@ -1412,3 +1412,5 @@ export default function Admin() {
   if (!user) return <LoginScreen onLogin={u => setUser(u)} />;
   return <AdminPanel user={user} onLogout={() => { authApi.logout(); setUser(null); }} onExit={() => navigate("/")} />;
 }
+
+
