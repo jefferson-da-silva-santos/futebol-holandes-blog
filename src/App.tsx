@@ -193,11 +193,6 @@ function HeroCard({ article, size, onClick }: { article: Article; size: "large" 
       <img src={article.image} alt={article.title} className="hero-img" />
       <div className="hero-overlay" />
       <div className="hero-body">
-        <div className="hero-badges">
-          {article.categories.map(cat => (
-            <span key={cat.id} className={`badge ${cat.badgeClass}`} style={{ background: cat.color }}>{cat.name}</span>
-          ))}
-        </div>
         {size === "large"
           ? <h2 className="hero-title">{article.title}</h2>
           : <h3 className="hero-sub-title">{article.title}</h3>}
@@ -717,20 +712,24 @@ function CategoryPage() {
 
   if (loading) return <PageSkeleton />;
 
-  // Decodifica o slug da URL e filtra artigos por nome de categoria
-  const categoryName = decodeURIComponent(categorySlug ?? "").replace(/-/g, " ");
+  // Normaliza o slug para comparação consistente
+  function toSlug(str: string) {
+    return str.toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9\s-]/g, "")
+      .trim().replace(/\s+/g, "-");
+  }
+
+  const slug = categorySlug ?? "";
   const filtered = articles.filter(a =>
-    a.published && a.categories.some(c =>
-      c.name.toLowerCase() === categoryName.toLowerCase() ||
-      c.name.toLowerCase().replace(/\s+/g, "-") === (categorySlug ?? "").toLowerCase()
-    )
+    a.published && a.categories.some(c => toSlug(c.name) === slug.toLowerCase())
   );
 
-  // Tenta pegar o nome real da categoria do primeiro artigo
-  const realName = filtered[0]?.categories.find(c =>
-    c.name.toLowerCase().replace(/\s+/g, "-") === (categorySlug ?? "").toLowerCase() ||
-    c.name.toLowerCase() === categoryName.toLowerCase()
-  )?.name ?? categoryName;
+  // Nome real da categoria
+  const realCat = articles
+    .flatMap(a => a.categories)
+    .find(c => toSlug(c.name) === slug.toLowerCase());
+  const realName = realCat?.name ?? decodeURIComponent(slug.replace(/-/g, " "));
 
   const openArticle = (slug: string) => navigate(`/noticia/${slug}`);
 

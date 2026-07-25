@@ -980,7 +980,23 @@ function MenuSection() {
   const [iconPickerFor, setIconPickerFor] = useState<string | null>(null);
 
   useEffect(() => {
-    menuApi.getAll().then(data => setItems(data.map(draftFromItem))).catch(() => showNotyf("error", "Erro ao carregar menu.")).finally(() => setLoading(false));
+    function toSlug(str: string) {
+      return str.toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9\s-]/g, "")
+        .trim().replace(/\s+/g, "-");
+    }
+    Promise.all([menuApi.getAll(), categoriesApi.list()])
+      .then(([menuData, cats]) => {
+        setItems(menuData.map(draftFromItem));
+        const catRoutes = cats.map(c => ({
+          path: `/categoria/${toSlug(c.name)}`,
+          label: `📂 Categoria: ${c.name}`,
+        }));
+        SITE_ROUTES = [...BASE_ROUTES, ...catRoutes];
+      })
+      .catch(() => showNotyf("error", "Erro ao carregar menu."))
+      .finally(() => setLoading(false));
   }, []);
 
   function blankItem(): MenuItemDraft { return { label: "", icon: "bx bx-link", path: "/", active: true, children: [] }; }
