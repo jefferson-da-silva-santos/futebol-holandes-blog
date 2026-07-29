@@ -762,6 +762,52 @@ function CategoryPage() {
   );
 }
 
+// Filtra notícias por clube/time (usado pelos itens de menu que antes viravam link externo)
+function TeamPage() {
+  const { clubSlug } = useParams<{ clubSlug: string }>();
+  const { articles, standing, nations, loading } = useSiteData();
+  const navigate = useNavigate();
+
+  if (loading) return <PageSkeleton />;
+
+  function toSlug(str: string) {
+    return str.toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9\s-]/g, "")
+      .trim().replace(/\s+/g, "-");
+  }
+
+  const slug = clubSlug ?? "";
+  const filtered = articles.filter(a => a.published && a.club && toSlug(a.club) === slug.toLowerCase());
+  const realClub = articles.find(a => a.club && toSlug(a.club) === slug.toLowerCase())?.club
+    ?? decodeURIComponent(slug.replace(/-/g, " "));
+  const openArticle = (s: string) => navigate(`/noticia/${s}`);
+
+  return (
+    <div className="layout-grid">
+      <main className="main">
+        <section className="page-section">
+          <div className="sec-head"><span className="sec-label"><i className="bx bx-football" /> {realClub}</span></div>
+          {filtered.length > 0 ? (
+            <div className="news-grid">
+              {filtered.map(n => <ArticleCard key={n.id} article={n} onClick={() => openArticle(n.slug)} />)}
+            </div>
+          ) : (
+            <div className="empty-state">
+              <i className="bx bx-news" />
+              <p>Nenhuma notícia encontrada para este time.</p>
+            </div>
+          )}
+        </section>
+      </main>
+      <aside className="sidebar">
+        <StandingsWidget standing={standing} />
+        <NationsWidget nations={nations} />
+      </aside>
+    </div>
+  );
+}
+
 function Layout() {
   const { config, menu } = useSiteData();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -904,6 +950,7 @@ export default function App() {
             <Route path="/selecao-holandesa" element={<SelecaoPage />} />
             <Route path="/noticia/:slug" element={<ArticlePage />} />
             <Route path="/categoria/:categorySlug" element={<CategoryPage />} />
+            <Route path="/time/:clubSlug" element={<TeamPage />} />
             <Route path="*" element={<HomePage />} />
           </Route>
         </Routes>

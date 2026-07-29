@@ -30,6 +30,8 @@ export interface Category { id: number; name: string; slug: string; badgeClass: 
 export interface Tag { id: number; name: string; slug: string; _count?: { articles: number }; }
 export interface Article {
   id: number; title: string; slug: string; meta: string; date: string;
+  // Data/hora real de publicação (calendário + hora) — define a ordem cronológica na listagem
+  publishedAt: string;
   image: string; icon: string; club?: string | null; tags: string[]; body: string[];
   bodyHtml: string;
   published: boolean; featured: boolean; createdAt: string; updatedAt: string;
@@ -39,7 +41,10 @@ export interface Article {
   tagRelations: Tag[];
 }
 export interface ArticleInput {
-  title: string; meta: string; date: string; image: string;
+  title: string; meta: string; date: string;
+  // ISO string (do input datetime-local) — controla a ordem cronológica no site
+  publishedAt: string;
+  image: string;
   imageSource?: "url" | "drive" | "upload";
   icon?: string; club?: string;
   // Nomes de tags digitados no TagsInput — o back-end cria a tag na hora se não existir

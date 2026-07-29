@@ -185,6 +185,26 @@ function CategoryChecklist({ categories, selectedIds, onChange }: {
   );
 }
 
+// ─── Helpers de data/hora de publicação ────────────────────────────────────────
+// Formata um Date para o texto de exibição do card (ex: "5 abr 2026")
+function formatDisplayDate(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "short", year: "numeric" })
+    .format(d).replace(".", "");
+}
+// Converte Date <-> valor do <input type="datetime-local"> (sem timezone, hora local)
+function toDatetimeLocal(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function fromDatetimeLocal(value: string): string {
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+}
+
 // ─── Article Form ─────────────────────────────────────────────────────────────
 function ArticleForm({ initial, categories, onSave, onCancel, saving }: {
   initial?: Article; categories: Category[];
@@ -194,7 +214,9 @@ function ArticleForm({ initial, categories, onSave, onCancel, saving }: {
   const [form, setForm] = useState<ArticleInput>(() =>
     initial
       ? {
-        title: initial.title, meta: initial.meta, date: initial.date, image: initial.image,
+        title: initial.title, meta: initial.meta, date: initial.date,
+        publishedAt: initial.publishedAt ?? new Date().toISOString(),
+        image: initial.image,
         icon: initial.icon, club: initial.club ?? "",
         body: initial.body,
         // Se bodyHtml estiver vazio mas houver conteúdo legado em body[], migra para HTML
@@ -207,7 +229,8 @@ function ArticleForm({ initial, categories, onSave, onCancel, saving }: {
         categoryIds: initial.categories.map(c => c.id),
       }
       : {
-        title: "", meta: "", date: "", image: "", icon: "bx bxs-trophy", club: "",
+        title: "", meta: "", date: "", publishedAt: new Date().toISOString(),
+        image: "", icon: "bx bxs-trophy", club: "",
         body: [], bodyHtml: "",
         imageSource: "url" as const,
         published: true, featured: false, categoryIds: categories[0] ? [categories[0].id] : [],
@@ -335,8 +358,20 @@ function ArticleForm({ initial, categories, onSave, onCancel, saving }: {
               {errors.meta && <span className="field-err">{errors.meta}</span>}
             </div>
             <div className={`adm-field ${errors.date ? "has-error" : ""}`}>
-              <label>Data <span className="req">*</span></label>
-              <input value={form.date} onChange={e => set("date", e.target.value)} placeholder="5 abr 2026" />
+              <label>Data e hora de publicação <span className="req">*</span></label>
+              <input
+                type="datetime-local"
+                value={toDatetimeLocal(form.publishedAt)}
+                onChange={e => {
+                  const iso = fromDatetimeLocal(e.target.value);
+                  setForm(f => ({ ...f, publishedAt: iso, date: formatDisplayDate(iso) }));
+                  setErrors(er => ({ ...er, date: "" }));
+                }}
+              />
+              <span className="adm-field-hint">
+                Define a ordem cronológica no site. Use uma data/hora passada para publicar uma matéria retroativa —
+                ela entrará na posição correta na lista, não na data de hoje.
+              </span>
               {errors.date && <span className="field-err">{errors.date}</span>}
             </div>
           </div>
@@ -986,14 +1021,36 @@ function MenuSection() {
         .replace(/[^a-z0-9\s-]/g, "")
         .trim().replace(/\s+/g, "-");
     }
-    Promise.all([menuApi.getAll(), categoriesApi.list()])
-      .then(([menuData, cats]) => {
-        setItems(menuData.map(draftFromItem));
+    Promise.all([menuApi.getAll(), categoriesApi.list(), articlesApi.list({ limit: 200 })])
+      .then(([menuData, cats, artRes]) => {
         const catRoutes = cats.map(c => ({
           path: `/categoria/${toSlug(c.name)}`,
           label: `📂 Categoria: ${c.name}`,
         }));
-        SITE_ROUTES = [...BASE_ROUTES, ...catRoutes];
+        // Times/clubes já usados em algum artigo — viram opção interna de filtro
+        // em vez de precisar de "Link externo" (que abria o site do time e recarregava a página)
+        const clubNames = Array.from(new Set(
+          artRes.articles.map(a => a.club).filter((c): c is string => !!c && c.trim() !== "")
+        )).sort();
+        const clubRoutes = clubNames.map(name => ({
+          path: `/time/${toSlug(name)}`,
+          label: `⚽ Time: ${name}`,
+        }));
+        SITE_ROUTES = [...BASE_ROUTES, ...catRoutes, ...clubRoutes];
+
+        // Migração automática: itens salvos como "link externo" cujo label bate com um
+        // time conhecido passam a apontar para o filtro interno /time/... (corrige o
+        // problema de a página recarregar ao clicar nesses itens do menu).
+        function migrate(it: MenuItemDraft): MenuItemDraft {
+          const isExternal = /^https?:\/\//.test(it.path);
+          const match = isExternal ? clubNames.find(n => toSlug(n) === toSlug(it.label)) : null;
+          return {
+            ...it,
+            path: match ? `/time/${toSlug(match)}` : it.path,
+            children: it.children.map(migrate),
+          };
+        }
+        setItems(menuData.map(it => migrate(draftFromItem(it))));
       })
       .catch(() => showNotyf("error", "Erro ao carregar menu."))
       .finally(() => setLoading(false));
@@ -1412,5 +1469,3 @@ export default function Admin() {
   if (!user) return <LoginScreen onLogin={u => setUser(u)} />;
   return <AdminPanel user={user} onLogout={() => { authApi.logout(); setUser(null); }} onExit={() => navigate("/")} />;
 }
-
-
