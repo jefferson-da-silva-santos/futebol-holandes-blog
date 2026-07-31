@@ -1022,38 +1022,42 @@ function MenuSection() {
         .trim().replace(/\s+/g, "-");
     }
     Promise.all([menuApi.getAll(), categoriesApi.list(), articlesApi.list({ limit: 200 })])
-      .then(([menuData, cats, artRes]) => {
-        const catRoutes = cats.map(c => ({
-          path: `/categoria/${toSlug(c.name)}`,
-          label: `📂 Categoria: ${c.name}`,
-        }));
-        // Times/clubes já usados em algum artigo — viram opção interna de filtro
-        // em vez de precisar de "Link externo" (que abria o site do time e recarregava a página)
-        const clubNames = Array.from(new Set(
-          artRes.articles.map(a => a.club).filter((c): c is string => !!c && c.trim() !== "")
-        )).sort();
-        const clubRoutes = clubNames.map(name => ({
-          path: `/time/${toSlug(name)}`,
-          label: `⚽ Time: ${name}`,
-        }));
-        SITE_ROUTES = [...BASE_ROUTES, ...catRoutes, ...clubRoutes];
+  .then(([menuData, cats, artRes]) => {
+    const catRoutes = cats.map(c => ({
+      path: `/categoria/${toSlug(c.name)}`,
+      label: `📂 Categoria: ${c.name}`,
+    }));
+    const clubNames = Array.from(new Set(
+      artRes.articles.map(a => a.club).filter((c): c is string => !!c && c.trim() !== "")
+    )).sort();
+    const clubRoutes = clubNames.map(name => ({
+      path: `/time/${toSlug(name)}`,
+      label: `⚽ Time: ${name}`,
+    }));
+    SITE_ROUTES = [...BASE_ROUTES, ...catRoutes, ...clubRoutes];
 
-        // Migração automática: itens salvos como "link externo" cujo label bate com um
-        // time conhecido passam a apontar para o filtro interno /time/... (corrige o
-        // problema de a página recarregar ao clicar nesses itens do menu).
-        function migrate(it: MenuItemDraft): MenuItemDraft {
-          const isExternal = /^https?:\/\//.test(it.path);
-          const match = isExternal ? clubNames.find(n => toSlug(n) === toSlug(it.label)) : null;
-          return {
-            ...it,
-            path: match ? `/time/${toSlug(match)}` : it.path,
-            children: it.children.map(migrate),
-          };
-        }
-        setItems(menuData.map(it => migrate(draftFromItem(it))));
-      })
-      .catch(() => showNotyf("error", "Erro ao carregar menu."))
-      .finally(() => setLoading(false));
+    // Migração automática: itens salvos como "link externo" cujo label bate com um
+    // time OU categoria conhecida passam a apontar para a rota interna correspondente
+    // (/time/... ou /categoria/...), corrigindo o reload de página ao clicar no menu.
+    function migrate(it: MenuItemDraft): MenuItemDraft {
+      const isExternal = /^https?:\/\//.test(it.path);
+      let newPath = it.path;
+      if (isExternal) {
+        const clubMatch = clubNames.find(n => toSlug(n) === toSlug(it.label));
+        const catMatch = clubMatch ? null : cats.find(c => toSlug(c.name) === toSlug(it.label));
+        if (clubMatch) newPath = `/time/${toSlug(clubMatch)}`;
+        else if (catMatch) newPath = `/categoria/${catMatch.slug}`;
+      }
+      return {
+        ...it,
+        path: newPath,
+        children: it.children.map(migrate),
+      };
+    }
+    setItems(menuData.map(it => migrate(draftFromItem(it))));
+  })
+  .catch(() => showNotyf("error", "Erro ao carregar menu."))
+  .finally(() => setLoading(false));
   }, []);
 
   function blankItem(): MenuItemDraft { return { label: "", icon: "bx bx-link", path: "/", active: true, children: [] }; }
