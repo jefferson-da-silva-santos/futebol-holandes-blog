@@ -869,7 +869,7 @@ function Layout() {
                       <div className="dropdown">
                         {item.children.map(child => (
                           isExternal(child.path)
-                            ? <a key={child.id} href={child.path} target="_blank" rel="noreferrer" onClick={closeMenus}><i className={child.icon} /> {child.label}</a>
+                            ? <a onAuxClick={(e) => e.preventDefault()} key={child.id} href={child.path} rel="noreferrer" onClick={closeMenus}><i className={child.icon} /> {child.label}</a>
                             : <Link key={child.id} to={child.path} onClick={closeMenus}><i className={child.icon} /> {child.label}</Link>
                         ))}
                       </div>
