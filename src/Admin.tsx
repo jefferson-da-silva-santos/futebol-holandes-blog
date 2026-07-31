@@ -1041,7 +1041,6 @@ function MenuSection() {
         // importa o formato em que o path estava salvo antes (link externo,
         // path relativo quebrado tipo "/nac-breda" sem prefixo, etc).
         function migrate(it: MenuItemDraft): MenuItemDraft {
-          // Prioriza categoria (é o padrão real usado no menu: um item por time = uma categoria)
           const catMatch = cats.find(c => toSlug(c.name) === toSlug(it.label));
           const clubMatch = catMatch ? null : clubNames.find(n => toSlug(n) === toSlug(it.label));
           const newPath = catMatch
