@@ -1,4 +1,4 @@
-const BASE = "https://api-futebool-holandes.vercel.app";
+const BASE = "https://api-futebool-holandes-s8bf.vercel.app";
 const TOKEN_KEY = "fh_admin_token";
 
 export const auth = {
