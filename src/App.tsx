@@ -7,13 +7,21 @@ import {
   type NationsGroup, type TopScorer, type SiteConfig, type MenuItem,
 } from "./api";
 import { useToast, ToastProvider } from "./utils/toast";
+import { resolveLink } from "./utils/links";
+import { useArticlesPage } from "./hooks/useArticlesPage";
+import PaginationBar from "./components/PaginationBar";
 import Admin from "./Admin";
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  DATA CONTEXT — carrega tudo uma vez e compartilha entre as páginas
+//  IMPORTANTE: `articles` foi REMOVIDO deste contexto de propósito. Antes,
+//  a lista global era buscada uma única vez com `limit: 50` e todas as
+//  páginas recortavam essa mesma lista (slice). Isso fazia com que qualquer
+//  artigo além dos ~23 primeiros nunca aparecesse em lugar nenhum do site,
+//  não importa quantos artigos novos fossem publicados. Agora cada página
+//  busca exatamente os artigos que precisa, paginados de verdade.
 // ═════════════════════════════════════════════════════════════════════════════
 interface DataContextValue {
-  articles: Article[];
   standing: Standing | null;
   nations: NationsGroup | null;
   scorers: TopScorer[];
@@ -27,7 +35,6 @@ interface DataContextValue {
 const DataContext = createContext<DataContextValue | null>(null);
 
 function DataProvider({ children }: { children: ReactNode }) {
-  const [articles, setArticles] = useState<Article[]>([]);
   const [standing, setStanding] = useState<Standing | null>(null);
   const [nations, setNations] = useState<NationsGroup | null>(null);
   const [scorers, setScorers] = useState<TopScorer[]>([]);
@@ -41,12 +48,10 @@ function DataProvider({ children }: { children: ReactNode }) {
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const [artRes, st, nat, sc, conv, fix, cfg, mnu] = await Promise.all([
-        articlesApi.list({ published: true, limit: 50 }),
+      const [st, nat, sc, conv, fix, cfg, mnu] = await Promise.all([
         standingsApi.get(), nationsApi.get(), scorersApi.list(),
         convocationApi.get(), fixturesApi.list(), configApi.get(), menuApi.get(),
       ]);
-      setArticles(artRes.articles.map(normalizeArticle));
       setStanding(st); setNations(nat); setScorers(sc);
       setConvocation(conv); setFixtures(fix); setConfig(cfg); setMenu(mnu);
     } catch {
@@ -59,7 +64,7 @@ function DataProvider({ children }: { children: ReactNode }) {
   useEffect(() => { reload(); }, [reload]);
 
   return (
-    <DataContext.Provider value={{ articles, standing, nations, scorers, convocation, fixtures, config, menu, loading, reload }}>
+    <DataContext.Provider value={{ standing, nations, scorers, convocation, fixtures, config, menu, loading, reload }}>
       {children}
     </DataContext.Provider>
   );
@@ -331,15 +336,34 @@ function PageSkeleton({ variant = "home" }: { variant?: "home" | "eredivisie" | 
 //  PÁGINAS
 // ═════════════════════════════════════════════════════════════════════════════
 function HomePage() {
-  const { articles, standing, nations, loading } = useSiteData();
+  const { standing, nations } = useSiteData();
   const navigate = useNavigate();
-  if (loading) return <PageSkeleton variant="home" />;
 
-  const published = articles.filter(a => a.published);
-  const highlights = published.slice(0, 3);
-  // Antes: só 3 (slice(3,6)). Agora: as últimas 20 depois dos 3 destaques.
-  const moreNews = published.slice(3, 23);
+  // Destaques: busca própria e independente, sempre os 3 mais recentes
+  // marcados como featured — não depende mais da lista geral.
+  const [highlights, setHighlights] = useState<Article[]>([]);
+  const [highlightsLoaded, setHighlightsLoaded] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    articlesApi.list({ published: true, featured: true, limit: 3, page: 1 })
+      .then(res => { if (alive) setHighlights(res.articles.map(normalizeArticle)); })
+      .catch(() => { if (alive) setHighlights([]); })
+      .finally(() => { if (alive) setHighlightsLoaded(true); });
+    return () => { alive = false; };
+  }, []);
+
+  // Grade "Mais Notícias": paginada de verdade via API.
+  const { articles: gridArticles, page, pages, loading: gridLoading, goToPage } = useArticlesPage({ limit: 12 });
+
+  // Na primeira página, evita repetir nos dois blocos um artigo que já
+  // apareceu nos Destaques.
+  const highlightIds = new Set(highlights.map(h => h.id));
+  const moreNews = page > 1 ? gridArticles : gridArticles.filter(a => !highlightIds.has(a.id));
+
   const openArticle = (slug: string) => navigate(`/noticia/${slug}`);
+
+  if (!highlightsLoaded && gridLoading) return <PageSkeleton variant="home" />;
 
   return (
     <div className="layout-grid">
@@ -359,12 +383,20 @@ function HomePage() {
             <div className="empty-state"><i className="bx bx-news" /><p>Nenhum artigo publicado ainda.</p></div>
           )}
         </section>
-        {moreNews.length > 0 && (
-          <section className="page-section">
-            <div className="sec-head"><span className="sec-label"><i className="bx bx-news" /> Mais Notícias</span></div>
-            <div className="news-grid">{moreNews.map(n => <ArticleCard key={n.id} article={n} onClick={() => openArticle(n.slug)} />)}</div>
-          </section>
-        )}
+
+        <section className="page-section">
+          <div className="sec-head"><span className="sec-label"><i className="bx bx-news" /> Mais Notícias</span></div>
+          {gridLoading ? (
+            <div className="news-grid"><SkCard /><SkCard /><SkCard /></div>
+          ) : moreNews.length > 0 ? (
+            <>
+              <div className="news-grid">{moreNews.map(n => <ArticleCard key={n.id} article={n} onClick={() => openArticle(n.slug)} />)}</div>
+              <PaginationBar page={page} pages={pages} onChange={goToPage} />
+            </>
+          ) : (
+            <div className="empty-state"><i className="bx bx-news" /><p>Nenhuma notícia encontrada.</p></div>
+          )}
+        </section>
       </main>
       <aside className="sidebar">
         <StandingsWidget standing={standing} />
@@ -375,12 +407,24 @@ function HomePage() {
 }
 
 function EredivisieePage() {
-  const { articles, standing, config, loading } = useSiteData();
+  const { standing, config } = useSiteData();
   const navigate = useNavigate();
-  if (loading) return <PageSkeleton variant="eredivisie" />;
+  const [news, setNews] = useState<Article[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const news = articles.filter(a => a.categories.some(c => c.name === "Eredivisie") && a.published);
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    articlesApi.list({ published: true, category: "Eredivisie", limit: 50 })
+      .then(res => { if (alive) setNews(res.articles.map(normalizeArticle)); })
+      .catch(() => { if (alive) setNews([]); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, []);
+
   const openArticle = (slug: string) => navigate(`/noticia/${slug}`);
+
+  if (loading) return <PageSkeleton variant="eredivisie" />;
 
   return (
     <div className="layout-grid">
@@ -430,12 +474,24 @@ function EredivisieePage() {
 }
 
 function SelecaoPage() {
-  const { articles, nations, scorers, convocation, fixtures, loading } = useSiteData();
+  const { nations, scorers, convocation, fixtures } = useSiteData();
   const navigate = useNavigate();
-  if (loading) return <PageSkeleton variant="selecao" />;
+  const [news, setNews] = useState<Article[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const news = articles.filter(a => a.categories.some(c => c.name === "Seleção Holandesa") && a.published);
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    articlesApi.list({ published: true, category: "Seleção Holandesa", limit: 50 })
+      .then(res => { if (alive) setNews(res.articles.map(normalizeArticle)); })
+      .catch(() => { if (alive) setNews([]); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, []);
+
   const openArticle = (slug: string) => navigate(`/noticia/${slug}`);
+
+  if (loading) return <PageSkeleton variant="selecao" />;
 
   return (
     <div className="layout-grid">
@@ -611,14 +667,44 @@ function ArticleBody({
 
 function ArticlePage() {
   const { slug } = useParams<{ slug: string }>();
-  const { articles, standing, nations, loading } = useSiteData();
+  const { standing, nations } = useSiteData();
   const navigate = useNavigate();
-  const article = articles.find(a => a.slug === slug);
+
+  // Busca o artigo diretamente pelo slug — não depende mais de uma lista
+  // global limitada, então artigos "fora dos primeiros N" continuam
+  // abrindo normalmente mesmo que não apareçam nas grades.
+  // undefined = carregando · null = não encontrado · Article = carregado
+  const [article, setArticle] = useState<Article | null | undefined>(undefined);
+  const [related, setRelated] = useState<Article[]>([]);
   const [lightbox, setLightbox] = useState<LightboxData | null>(null);
 
-  useEffect(() => { window.scrollTo({ top: 0, behavior: "smooth" }); }, [slug]);
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (!slug) { setArticle(null); return; }
+    let alive = true;
+    setArticle(undefined);
+    articlesApi.get(slug)
+      .then(a => { if (alive) setArticle(normalizeArticle(a)); })
+      .catch(() => { if (alive) setArticle(null); });
+    return () => { alive = false; };
+  }, [slug]);
 
-  if (loading) return <PageSkeleton variant="article" />;
+  useEffect(() => {
+    if (!article) { setRelated([]); return; }
+    const firstCat = article.categories[0]?.slug;
+    if (!firstCat) { setRelated([]); return; }
+    let alive = true;
+    articlesApi.list({ published: true, category: firstCat, limit: 4 })
+      .then(res => {
+        if (!alive) return;
+        const list = res.articles.map(normalizeArticle).filter(a => a.id !== article.id).slice(0, 2);
+        setRelated(list);
+      })
+      .catch(() => { if (alive) setRelated([]); });
+    return () => { alive = false; };
+  }, [article]);
+
+  if (article === undefined) return <PageSkeleton variant="article" />;
 
   if (!article) {
     return (
@@ -634,9 +720,6 @@ function ArticlePage() {
     );
   }
 
-  const related = articles.filter(a =>
-    a.id !== article.id && a.categories.some(c => article.categories.some(ac => ac.id === c.id))
-  ).slice(0, 2);
   // bodyHtml para novos artigos, body legado para artigos antigos
   const rawText = article.bodyHtml
     ? article.bodyHtml.replace(/<[^>]+>/g, " ")
@@ -703,35 +786,30 @@ function ArticlePage() {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  LAYOUT (topbar + navbar + footer compartilhados)
+//  CATEGORY PAGE — agora paginada de verdade e alimentada pelo menu via SPA
 // ═════════════════════════════════════════════════════════════════════════════
 function CategoryPage() {
   const { categorySlug } = useParams<{ categorySlug: string }>();
-  const { articles, standing, nations, loading } = useSiteData();
+  const { standing, nations } = useSiteData();
   const navigate = useNavigate();
 
-  if (loading) return <PageSkeleton />;
+  const { articles, page, pages, loading, goToPage } = useArticlesPage({
+    category: categorySlug,
+    limit: 12,
+  });
 
-  // Normaliza o slug para comparação consistente
-  function toSlug(str: string) {
-    return str.toLowerCase()
-      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9\s-]/g, "")
-      .trim().replace(/\s+/g, "-");
-  }
-
-  const slug = categorySlug ?? "";
-  const filtered = articles.filter(a =>
-    a.published && a.categories.some(c => toSlug(c.name) === slug.toLowerCase())
+  const [realName, setRealName] = useState(
+    categorySlug ? decodeURIComponent(categorySlug.replace(/-/g, " ")) : ""
   );
 
-  // Nome real da categoria
-  const realCat = articles
-    .flatMap(a => a.categories)
-    .find(c => toSlug(c.name) === slug.toLowerCase());
-  const realName = realCat?.name ?? decodeURIComponent(slug.replace(/-/g, " "));
+  useEffect(() => {
+    const cat = articles.flatMap(a => a.categories).find(c => c.slug === categorySlug);
+    if (cat) setRealName(cat.name);
+  }, [articles, categorySlug]);
 
   const openArticle = (slug: string) => navigate(`/noticia/${slug}`);
+
+  if (loading && articles.length === 0) return <PageSkeleton />;
 
   return (
     <div className="layout-grid">
@@ -742,10 +820,13 @@ function CategoryPage() {
               <i className="bx bx-purchase-tag" /> {realName}
             </span>
           </div>
-          {filtered.length > 0 ? (
-            <div className="news-grid">
-              {filtered.map(n => <ArticleCard key={n.id} article={n} onClick={() => openArticle(n.slug)} />)}
-            </div>
+          {articles.length > 0 ? (
+            <>
+              <div className="news-grid">
+                {articles.map(n => <ArticleCard key={n.id} article={n} onClick={() => openArticle(n.slug)} />)}
+              </div>
+              <PaginationBar page={page} pages={pages} onChange={goToPage} />
+            </>
           ) : (
             <div className="empty-state">
               <i className="bx bx-news" />
@@ -762,13 +843,17 @@ function CategoryPage() {
   );
 }
 
-// Filtra notícias por clube/time (usado pelos itens de menu que antes viravam link externo)
+// Filtra notícias por clube/time (usado pelos itens de menu de "Eredivisie")
 function TeamPage() {
   const { clubSlug } = useParams<{ clubSlug: string }>();
-  const { articles, standing, nations, loading } = useSiteData();
+  const { standing, nations } = useSiteData();
   const navigate = useNavigate();
 
-  if (loading) return <PageSkeleton />;
+  const [articles, setArticles] = useState<Article[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [realClub, setRealClub] = useState(
+    clubSlug ? decodeURIComponent(clubSlug.replace(/-/g, " ")) : ""
+  );
 
   function toSlug(str: string) {
     return str.toLowerCase()
@@ -777,20 +862,38 @@ function TeamPage() {
       .trim().replace(/\s+/g, "-");
   }
 
-  const slug = clubSlug ?? "";
-  const filtered = articles.filter(a => a.published && a.club && toSlug(a.club) === slug.toLowerCase());
-  const realClub = articles.find(a => a.club && toSlug(a.club) === slug.toLowerCase())?.club
-    ?? decodeURIComponent(slug.replace(/-/g, " "));
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    // A API não filtra por clube diretamente; busca um lote amplo de
+    // publicados e filtra no cliente. Suficiente para o volume atual do
+    // site — se crescer muito, dá para expor `?club=` na API depois.
+    articlesApi.list({ published: true, limit: 200 })
+      .then(res => {
+        if (!alive) return;
+        const all = res.articles.map(normalizeArticle);
+        const slug = (clubSlug ?? "").toLowerCase();
+        const filtered = all.filter(a => a.club && toSlug(a.club) === slug);
+        setArticles(filtered);
+        if (filtered[0]?.club) setRealClub(filtered[0].club);
+      })
+      .catch(() => { if (alive) setArticles([]); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [clubSlug]);
+
   const openArticle = (s: string) => navigate(`/noticia/${s}`);
+
+  if (loading) return <PageSkeleton />;
 
   return (
     <div className="layout-grid">
       <main className="main">
         <section className="page-section">
           <div className="sec-head"><span className="sec-label"><i className="bx bx-football" /> {realClub}</span></div>
-          {filtered.length > 0 ? (
+          {articles.length > 0 ? (
             <div className="news-grid">
-              {filtered.map(n => <ArticleCard key={n.id} article={n} onClick={() => openArticle(n.slug)} />)}
+              {articles.map(n => <ArticleCard key={n.id} article={n} onClick={() => openArticle(n.slug)} />)}
             </div>
           ) : (
             <div className="empty-state">
@@ -831,7 +934,6 @@ function Layout() {
   const footerCopy = config.footer_copy || "© 2026 Futebol Holandês · Todos os direitos reservados";
 
   function closeMenus() { setMenuOpen(false); setOpenDropdownId(null); }
-  function isExternal(path: string) { return /^https?:\/\//.test(path); }
 
   return (
     <div className="app">
@@ -858,6 +960,7 @@ function Layout() {
           <div className="nav-links">
             {menu.map(item => {
               const hasChildren = item.children && item.children.length > 0;
+
               if (hasChildren) {
                 return (
                   <div className="nav-dropdown" key={item.id}>
@@ -867,24 +970,43 @@ function Layout() {
                     </button>
                     {openDropdownId === item.id && (
                       <div className="dropdown">
-                        {item.children.map(child => (
-                          isExternal(child.path)
-                            ? <a onAuxClick={(e) => e.preventDefault()} key={child.id} href={child.path} rel="noreferrer" onClick={closeMenus}><i className={child.icon} /> {child.label}</a>
-                            : <Link key={child.id} to={child.path} onClick={closeMenus}><i className={child.icon} /> {child.label}</Link>
-                        ))}
+                        {item.children.map(child => {
+                          // Resolução DEFINITIVA: qualquer link que aponte pro
+                          // próprio domínio navega via <Link> (SPA, sem reload),
+                          // mesmo que tenha sido salvo como URL absoluta ou com
+                          // formato antigo. Só links de outros sites viram <a>.
+                          const { internal, to } = resolveLink(child.path);
+                          return internal ? (
+                            <Link key={child.id} to={to} onClick={closeMenus}>
+                              <i className={child.icon} /> {child.label}
+                            </Link>
+                          ) : (
+                            <a key={child.id} href={child.path} target="_blank" rel="noreferrer" onClick={closeMenus}>
+                              <i className={child.icon} /> {child.label}
+                            </a>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
                 );
               }
-              return isExternal(item.path) ? (
+
+              const { internal, to } = resolveLink(item.path);
+              return internal ? (
+                <NavLink
+                  key={item.id}
+                  to={to}
+                  end={to === "/"}
+                  className={({ isActive }) => `nav-btn${isActive ? " nav-active" : ""}`}
+                  onClick={closeMenus}
+                >
+                  <i className={item.icon} /> {item.label}
+                </NavLink>
+              ) : (
                 <a key={item.id} href={item.path} target="_blank" rel="noreferrer" className="nav-btn" onClick={closeMenus}>
                   <i className={item.icon} /> {item.label}
                 </a>
-              ) : (
-                <NavLink key={item.id} to={item.path} end={item.path === "/"} className={({ isActive }) => `nav-btn${isActive ? " nav-active" : ""}`} onClick={closeMenus}>
-                  <i className={item.icon} /> {item.label}
-                </NavLink>
               );
             })}
           </div>
@@ -896,22 +1018,48 @@ function Layout() {
           <div className="mobile-drawer">
             {menu.map(item => {
               const hasChildren = item.children && item.children.length > 0;
+
               if (hasChildren) {
                 return (
                   <div key={item.id}>
                     <span className="mob-link" style={{ opacity: 0.6, cursor: "default" }}><i className={item.icon} /> {item.label}</span>
-                    {item.children.map(child => (
-                      isExternal(child.path)
-                        ? <a key={child.id} href={child.path} target="_blank" rel="noreferrer" className="mob-link" style={{ paddingLeft: "2.5rem" }} onClick={closeMenus}><i className={child.icon} /> {child.label}</a>
-                        : <NavLink key={child.id} to={child.path} className={({ isActive }) => `mob-link${isActive ? " mob-active" : ""}`} style={{ paddingLeft: "2.5rem" }} onClick={closeMenus}><i className={child.icon} /> {child.label}</NavLink>
-                    ))}
+                    {item.children.map(child => {
+                      const { internal, to } = resolveLink(child.path);
+                      return internal ? (
+                        <NavLink
+                          key={child.id}
+                          to={to}
+                          className={({ isActive }) => `mob-link${isActive ? " mob-active" : ""}`}
+                          style={{ paddingLeft: "2.5rem" }}
+                          onClick={closeMenus}
+                        >
+                          <i className={child.icon} /> {child.label}
+                        </NavLink>
+                      ) : (
+                        <a key={child.id} href={child.path} target="_blank" rel="noreferrer" className="mob-link" style={{ paddingLeft: "2.5rem" }} onClick={closeMenus}>
+                          <i className={child.icon} /> {child.label}
+                        </a>
+                      );
+                    })}
                   </div>
                 );
               }
-              return isExternal(item.path) ? (
-                <a key={item.id} href={item.path} target="_blank" rel="noreferrer" className="mob-link" onClick={closeMenus}><i className={item.icon} /> {item.label}</a>
+
+              const { internal, to } = resolveLink(item.path);
+              return internal ? (
+                <NavLink
+                  key={item.id}
+                  to={to}
+                  end={to === "/"}
+                  className={({ isActive }) => `mob-link${isActive ? " mob-active" : ""}`}
+                  onClick={closeMenus}
+                >
+                  <i className={item.icon} /> {item.label}
+                </NavLink>
               ) : (
-                <NavLink key={item.id} to={item.path} end={item.path === "/"} className={({ isActive }) => `mob-link${isActive ? " mob-active" : ""}`} onClick={closeMenus}><i className={item.icon} /> {item.label}</NavLink>
+                <a key={item.id} href={item.path} target="_blank" rel="noreferrer" className="mob-link" onClick={closeMenus}>
+                  <i className={item.icon} /> {item.label}
+                </a>
               );
             })}
             <button className="mob-link" onClick={() => { closeMenus(); navigate("/admin"); }}><i className="bx bxs-dashboard" /> Painel Admin</button>

@@ -5,6 +5,8 @@ import { useLocalStorage } from "./hooks/useLocalStorage";
 import ColorPicker from "./components/ColorPicker";
 import RichEditor from "./components/RichEditorProps";
 import TagsInput from "./components/TagsInput";
+import { SITE_BASE_URL } from "./config";
+import { isKnownRoute } from "./utils/links";
 import {
   authApi, articlesApi, categoriesApi, standingsApi, convocationApi,
   fixturesApi, nationsApi, scorersApi, configApi, menuApi, uploadApi, normalizeArticle, auth,
@@ -12,8 +14,6 @@ import {
   type StandingEntry, type Fixture,
   type NationsEntry, type SiteConfig, type MenuItem, type MenuItemInput,
 } from "./api";
-
-const SITE_BASE_URL = "https://futebolholandes.blog.br"; // usado para exibir o link público de categorias/tags
 
 // ─── Migração de conteúdo legado ──────────────────────────────────────────────
 // Artigos antigos guardam o texto em `body` (array de parágrafos simples),
@@ -259,9 +259,7 @@ function ArticleForm({ initial, categories, onSave, onCancel, saving }: {
   }
 
   async function handleSave() {
-    console.log("[DEBUG] handleSave chamado. form atual:", form); // TEMPORÁRIO — remover depois de diagnosticar
     const e = validate();
-    console.log("[DEBUG] erros de validação:", e); // TEMPORÁRIO
     if (Object.keys(e).length > 0) {
       setErrors(e);
       const firstMsg = Object.values(e)[0];
@@ -269,12 +267,10 @@ function ArticleForm({ initial, categories, onSave, onCancel, saving }: {
       return;
     }
     try {
-      console.log("[DEBUG] validação passou, chamando onSave..."); // TEMPORÁRIO
       await onSave({
         ...form,
         tagNames: tags,
       });
-      console.log("[DEBUG] onSave concluído sem erro."); // TEMPORÁRIO
     } catch (err: any) {
       console.error("Erro ao salvar artigo:", err);
       showNotyf("error", err?.message || "Erro inesperado ao salvar o artigo.");
@@ -1036,18 +1032,47 @@ function MenuSection() {
         }));
         SITE_ROUTES = [...BASE_ROUTES, ...catRoutes, ...clubRoutes];
 
-        // Migração automática: se o LABEL do item bate com um time ou categoria
-        // conhecida, força o path correto (/time/... ou /categoria/...), não
-        // importa o formato em que o path estava salvo antes (link externo,
-        // path relativo quebrado tipo "/nac-breda" sem prefixo, etc).
+        // ── Migração DEFINITIVA de links quebrados ──────────────────────────
+        // Bug original: itens salvos como URL ABSOLUTA do próprio domínio
+        // com um caminho de UM segmento só (ex: "https://futebolholandes.blog.br/fc-twente",
+        // em vez de "/time/fc-twente"). Isso não batia com nenhuma rota real
+        // do site (só existem "/", "/eredivisie", "/selecao-holandesa",
+        // "/categoria/:slug", "/time/:slug", "/noticia/:slug"), então mesmo
+        // depois de virar um <Link> (sem reload) o clique caía no fallback "*"
+        // e mostrava a Home — não filtrava nada.
+        //
+        // Esta função agora resolve em 3 passos:
+        //  1) Se for URL absoluta do próprio domínio, extrai só o pathname.
+        //  2) Se o pathname já bate com uma rota conhecida, não mexe mais.
+        //  3) Senão, tenta casar o LABEL do item (ou o slug restante do path
+        //     antigo) com uma categoria ou um clube já cadastrado; se nenhum
+        //     dos dois bater, assume que é um time do dropdown Eredivisie e
+        //     usa o slug restante como "/time/<slug>" — item que ainda não
+        //     tem artigo publicado mostra "nenhuma notícia", que é o estado
+        //     correto, não um bug.
         function migrate(it: MenuItemDraft): MenuItemDraft {
-          const catMatch = cats.find(c => toSlug(c.name) === toSlug(it.label));
-          const clubMatch = catMatch ? null : clubNames.find(n => toSlug(n) === toSlug(it.label));
-          const newPath = catMatch
-            ? `/categoria/${catMatch.slug}`
-            : clubMatch
-              ? `/time/${toSlug(clubMatch)}`
-              : it.path;
+          let newPath = it.path;
+
+          const isAbsoluteUrl = /^https?:\/\//.test(newPath);
+          if (isAbsoluteUrl) {
+            try {
+              const url = new URL(newPath);
+              if (url.hostname === "futebolholandes.blog.br" || url.hostname === "www.futebolholandes.blog.br") {
+                newPath = url.pathname || "/";
+              }
+            } catch { /* URL malformada — segue para o link externo de verdade */ }
+          }
+
+          if (!isKnownRoute(newPath)) {
+            const bareSlug = newPath.replace(/^\//, "");
+            const catMatch = cats.find(c => toSlug(c.name) === toSlug(it.label) || c.slug === bareSlug);
+            const clubMatch = !catMatch && clubNames.find(n => toSlug(n) === toSlug(it.label) || toSlug(n) === bareSlug);
+
+            if (catMatch) newPath = `/categoria/${catMatch.slug}`;
+            else if (clubMatch) newPath = `/time/${toSlug(clubMatch)}`;
+            else if (bareSlug) newPath = `/time/${bareSlug}`;
+          }
+
           return { ...it, path: newPath, children: it.children.map(migrate) };
         }
         setItems(menuData.map(it => migrate(draftFromItem(it))));
@@ -1103,6 +1128,7 @@ function MenuSection() {
       <div style={{ padding: "1.25rem 1.5rem", display: "flex", flexDirection: "column", gap: "0.85rem" }}>
         <p className="adm-field-hint" style={{ marginTop: 0 }}>
           Defina os itens do menu principal do site. Arraste a ordem com as setas e adicione sub-itens (dropdown) quando necessário.
+          Links que apontam para páginas do próprio site nunca recarregam a página — mesmo que tenham sido salvos como URL completa.
         </p>
 
         {items.map((item, i) => {
