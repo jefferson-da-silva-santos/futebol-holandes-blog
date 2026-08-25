@@ -1309,7 +1309,7 @@ function AdminPanel({ user, onLogout, onExit }: { user: AdminUser; onLogout: () 
   async function loadAll() {
     setLoading(true);
     try {
-      const [catRes, artRes] = await Promise.all([categoriesApi.list(), articlesApi.list({ limit: 100 })]);
+      const [catRes, artRes] = await Promise.all([categoriesApi.list(), articlesApi.list({ limit: 9999 })]);
       setCategories(catRes); setArticles(artRes.articles.map(normalizeArticle));
     } catch (err: any) { showNotyf("error", err.message ?? "Erro ao carregar."); }
     finally { setLoading(false); }
