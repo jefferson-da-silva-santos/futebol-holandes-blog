@@ -600,6 +600,28 @@ function ArticleBody({
         a.textContent = twitterUrl;
         bq.appendChild(a);
         el.appendChild(bq);
+
+        // Fallback: o widgets.js do X é frequentemente bloqueado por
+        // ad blockers e proteções de rastreamento (Brave, Firefox, uBlock
+        // etc.), sem gerar nenhum erro visível — o script simplesmente
+        // nunca baixa e o post fica invisível pra sempre. Se depois de um
+        // tempo o blockquote não virou iframe, mostra um card clicável
+        // com o link em vez de deixar o espaço em branco.
+        window.setTimeout(() => {
+          if (!el.querySelector("iframe")) {
+            el.innerHTML = `
+              <div class="tweet-editor-preview">
+                <div class="tweet-preview-header">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                  </svg>
+                  <strong>Post do X</strong>
+                </div>
+                <a class="tweet-preview-url" href="${twitterUrl}" target="_blank" rel="noopener noreferrer">${twitterUrl}</a>
+                <p class="tweet-preview-note">Não foi possível carregar a prévia — toque para abrir no X</p>
+              </div>`;
+          }
+        }, 4000);
       });
 
       // Padrão oficial do X for Websites (twttr.ready). Usar apenas o
@@ -645,6 +667,22 @@ function ArticleBody({
         bq.setAttribute("data-instgrm-version", "14");
         bq.style.margin = "0 auto";
         el.appendChild(bq);
+
+        // Mesmo fallback do Twitter/X: embed.js do Instagram também é
+        // alvo comum de bloqueadores de rastreamento.
+        window.setTimeout(() => {
+          if (!el.querySelector("iframe")) {
+            el.innerHTML = `
+              <div class="tweet-editor-preview">
+                <div class="tweet-preview-header">
+                  <i class="bx bxl-instagram" style="font-size:18px;color:#E1306C"></i>
+                  <strong>Post do Instagram</strong>
+                </div>
+                <a class="tweet-preview-url" href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>
+                <p class="tweet-preview-note">Não foi possível carregar a prévia — toque para abrir no Instagram</p>
+              </div>`;
+          }
+        }, 4000);
       });
       const win = window as any;
       if (win.instgrm?.Embeds?.process) {
