@@ -545,6 +545,7 @@ function SelecaoPage() {
   );
 }
 
+
 // Renderiza o corpo do artigo, ativa embeds do Twitter/Instagram e abre o lightbox ao clicar em imagens
 function ArticleBody({
   bodyHtml, body, onImageClick,
@@ -581,6 +582,13 @@ function ArticleBody({
       tweetDivs.forEach(el => {
         const url = el.getAttribute("data-tweet-url");
         if (!url) return;
+        // O widgets.js do Twitter/X não renderiza embeds cujo link usa o domínio
+        // "x.com" — só funciona com "twitter.com". Sem essa conversão, o embed
+        // fica preso indefinidamente no estado de "carregando".
+        const twitterUrl = url.replace(
+          /^https?:\/\/(www\.)?x\.com/i,
+          "https://twitter.com"
+        );
         // Sempre reconstrói para garantir que o widget processe
         el.innerHTML = "";
         const bq = document.createElement("blockquote");
@@ -589,8 +597,8 @@ function ArticleBody({
         bq.setAttribute("data-dnt", "true");
         bq.setAttribute("data-theme", "light");
         const a = document.createElement("a");
-        a.href = url;
-        a.textContent = url;
+        a.href = twitterUrl;
+        a.textContent = twitterUrl;
         bq.appendChild(a);
         el.appendChild(bq);
       });
