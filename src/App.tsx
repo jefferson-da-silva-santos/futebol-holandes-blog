@@ -555,11 +555,10 @@ function ArticleBody({
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
+  // ── Clique nas imagens → lightbox (depende de onImageClick) ──────────────
   useEffect(() => {
     if (!bodyHtml || !ref.current) return;
     const container = ref.current;
-
-    // ── Clique nas imagens do corpo → abre o lightbox ─────────────────────
     function handleClick(e: MouseEvent) {
       const target = e.target as HTMLElement;
       if (target.tagName === "IMG" && target.classList.contains("re-img")) {
@@ -568,63 +567,76 @@ function ArticleBody({
       }
     }
     container.addEventListener("click", handleClick);
+    return () => { container.removeEventListener("click", handleClick); };
+  }, [bodyHtml, onImageClick]);
 
-    // ── Processar embeds do Twitter/X ─────────────────────────────────────
+  // ── Embeds de Twitter/X e Instagram (só depende do bodyHtml) ──────────────
+  useEffect(() => {
+    if (!bodyHtml || !ref.current) return;
+    const container = ref.current;
+
+    // Twitter/X
     const tweetDivs = container.querySelectorAll<HTMLElement>("[data-tweet-url]");
     if (tweetDivs.length > 0) {
+      // Monta os blockquotes que o widget processa
       tweetDivs.forEach(el => {
         const url = el.getAttribute("data-tweet-url");
-        if (!url || el.querySelector("blockquote.twitter-tweet")) return;
-
+        if (!url) return;
+        // Limpa sempre para garantir reprocessamento correto
+        el.innerHTML = "";
         const bq = document.createElement("blockquote");
         bq.className = "twitter-tweet";
         bq.setAttribute("data-lang", "pt");
         bq.setAttribute("data-dnt", "true");
         bq.setAttribute("data-theme", "light");
-
         const a = document.createElement("a");
         a.href = url;
         a.textContent = url;
         bq.appendChild(a);
-
-        el.innerHTML = "";
         el.appendChild(bq);
       });
 
+      function loadTwitter() {
+        const win = window as any;
+        if (win.twttr?.widgets?.load) {
+          win.twttr.widgets.load(container);
+        }
+      }
+
       const win = window as any;
       if (win.twttr?.widgets?.load) {
-        win.twttr.widgets.load(container);
+        loadTwitter();
       } else {
         const scriptId = "twitter-wjs";
-        if (!document.getElementById(scriptId)) {
+        const existing = document.getElementById(scriptId);
+        if (existing) {
+          // Script já existe mas ainda carregando — aguarda
+          existing.addEventListener("load", loadTwitter, { once: true });
+        } else {
           const s = document.createElement("script");
           s.id = scriptId;
           s.src = "https://platform.twitter.com/widgets.js";
           s.async = true;
           s.charset = "utf-8";
-          s.onload = () => {
-            (window as any).twttr?.widgets?.load(container);
-          };
+          s.onload = loadTwitter;
           document.body.appendChild(s);
         }
       }
     }
 
-    // ── Processar embeds do Instagram ──────────────────────────────────────
+    // Instagram
     const igDivs = container.querySelectorAll<HTMLElement>("[data-instagram-url]");
     if (igDivs.length > 0) {
       igDivs.forEach(el => {
         const url = el.getAttribute("data-instagram-url");
-        if (!url || el.querySelector("blockquote.instagram-media")) return;
-
+        if (!url) return;
+        el.innerHTML = "";
         const bq = document.createElement("blockquote");
         bq.className = "instagram-media";
         bq.setAttribute("data-instgrm-captioned", "");
         bq.setAttribute("data-instgrm-permalink", url);
         bq.setAttribute("data-instgrm-version", "14");
         bq.style.margin = "0 auto";
-
-        el.innerHTML = "";
         el.appendChild(bq);
       });
 
@@ -638,18 +650,12 @@ function ArticleBody({
           s.id = scriptId;
           s.src = "https://www.instagram.com/embed.js";
           s.async = true;
-          s.onload = () => {
-            (window as any).instgrm?.Embeds?.process();
-          };
+          s.onload = () => { (window as any).instgrm?.Embeds?.process(); };
           document.body.appendChild(s);
         }
       }
     }
-
-    return () => {
-      container.removeEventListener("click", handleClick);
-    };
-  }, [bodyHtml, onImageClick]);
+  }, [bodyHtml]);
 
   if (bodyHtml) {
     return (
