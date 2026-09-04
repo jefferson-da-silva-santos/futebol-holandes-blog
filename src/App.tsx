@@ -555,7 +555,7 @@ function ArticleBody({
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
-  // ── Clique nas imagens → lightbox (depende de onImageClick) ──────────────
+  // Lightbox — depende de onImageClick
   useEffect(() => {
     if (!bodyHtml || !ref.current) return;
     const container = ref.current;
@@ -570,7 +570,7 @@ function ArticleBody({
     return () => { container.removeEventListener("click", handleClick); };
   }, [bodyHtml, onImageClick]);
 
-  // ── Embeds de Twitter/X e Instagram (só depende do bodyHtml) ──────────────
+  // Embeds Twitter/Instagram — depende só do bodyHtml
   useEffect(() => {
     if (!bodyHtml || !ref.current) return;
     const container = ref.current;
@@ -578,11 +578,10 @@ function ArticleBody({
     // Twitter/X
     const tweetDivs = container.querySelectorAll<HTMLElement>("[data-tweet-url]");
     if (tweetDivs.length > 0) {
-      // Monta os blockquotes que o widget processa
       tweetDivs.forEach(el => {
         const url = el.getAttribute("data-tweet-url");
         if (!url) return;
-        // Limpa sempre para garantir reprocessamento correto
+        // Sempre reconstrói para garantir que o widget processe
         el.innerHTML = "";
         const bq = document.createElement("blockquote");
         bq.className = "twitter-tweet";
@@ -596,29 +595,26 @@ function ArticleBody({
         el.appendChild(bq);
       });
 
-      function loadTwitter() {
-        const win = window as any;
-        if (win.twttr?.widgets?.load) {
-          win.twttr.widgets.load(container);
-        }
+      function runTwitter() {
+        (window as any).twttr?.widgets?.load(container);
       }
 
       const win = window as any;
       if (win.twttr?.widgets?.load) {
-        loadTwitter();
+        runTwitter();
       } else {
         const scriptId = "twitter-wjs";
-        const existing = document.getElementById(scriptId);
+        const existing = document.getElementById(scriptId) as HTMLScriptElement | null;
         if (existing) {
-          // Script já existe mas ainda carregando — aguarda
-          existing.addEventListener("load", loadTwitter, { once: true });
+          // Script no DOM mas ainda carregando
+          existing.addEventListener("load", runTwitter, { once: true });
         } else {
           const s = document.createElement("script");
           s.id = scriptId;
           s.src = "https://platform.twitter.com/widgets.js";
           s.async = true;
           s.charset = "utf-8";
-          s.onload = loadTwitter;
+          s.onload = runTwitter;
           document.body.appendChild(s);
         }
       }
@@ -639,7 +635,6 @@ function ArticleBody({
         bq.style.margin = "0 auto";
         el.appendChild(bq);
       });
-
       const win = window as any;
       if (win.instgrm?.Embeds?.process) {
         win.instgrm.Embeds.process();
