@@ -572,44 +572,50 @@ function ArticleBody({
 
   // Embeds Twitter/Instagram — depende só do bodyHtml
   useEffect(() => {
+    // DIAGNÓSTICO TEMPORÁRIO — remover depois de identificar o problema
+    console.log("[embed-debug] efeito rodou. bodyHtml existe?", !!bodyHtml, "ref.current existe?", !!ref.current);
     if (!bodyHtml || !ref.current) return;
     const container = ref.current;
 
     // Twitter/X
     const tweetDivs = container.querySelectorAll<HTMLElement>("[data-tweet-url]");
+    console.log("[embed-debug] divs de tweet encontradas:", tweetDivs.length);
     if (tweetDivs.length > 0) {
       tweetDivs.forEach(el => {
-        const url = el.getAttribute("data-tweet-url");
-        if (!url) return;
-        // O widgets.js do Twitter/X não renderiza embeds cujo link usa o domínio
-        // "x.com" — só funciona com "twitter.com". Sem essa conversão, o embed
-        // fica preso indefinidamente no estado de "carregando".
-        const twitterUrl = url.replace(
-          /^https?:\/\/(www\.)?x\.com/i,
-          "https://twitter.com"
-        );
-        // Sempre reconstrói para garantir que o widget processe
-        el.innerHTML = "";
-        const bq = document.createElement("blockquote");
-        bq.className = "twitter-tweet";
-        bq.setAttribute("data-lang", "pt");
-        bq.setAttribute("data-dnt", "true");
-        bq.setAttribute("data-theme", "light");
-        const a = document.createElement("a");
-        a.href = twitterUrl;
-        a.textContent = twitterUrl;
-        bq.appendChild(a);
-        el.appendChild(bq);
+        try {
+          const url = el.getAttribute("data-tweet-url");
+          console.log("[embed-debug] processando url:", url);
+          if (!url) return;
+          // O widgets.js do Twitter/X não renderiza embeds cujo link usa o domínio
+          // "x.com" — só funciona com "twitter.com". Sem essa conversão, o embed
+          // fica preso indefinidamente no estado de "carregando".
+          const twitterUrl = url.replace(
+            /^https?:\/\/(www\.)?x\.com/i,
+            "https://twitter.com"
+          );
+          // Sempre reconstrói para garantir que o widget processe
+          el.innerHTML = "";
+          const bq = document.createElement("blockquote");
+          bq.className = "twitter-tweet";
+          bq.setAttribute("data-lang", "pt");
+          bq.setAttribute("data-dnt", "true");
+          bq.setAttribute("data-theme", "light");
+          const a = document.createElement("a");
+          a.href = twitterUrl;
+          a.textContent = twitterUrl;
+          bq.appendChild(a);
+          el.appendChild(bq);
+          console.log("[embed-debug] blockquote inserido com sucesso para:", url);
 
-        // Fallback: o widgets.js do X é frequentemente bloqueado por
-        // ad blockers e proteções de rastreamento (Brave, Firefox, uBlock
-        // etc.), sem gerar nenhum erro visível — o script simplesmente
-        // nunca baixa e o post fica invisível pra sempre. Se depois de um
-        // tempo o blockquote não virou iframe, mostra um card clicável
-        // com o link em vez de deixar o espaço em branco.
-        window.setTimeout(() => {
-          if (!el.querySelector("iframe")) {
-            el.innerHTML = `
+          // Fallback: o widgets.js do X é frequentemente bloqueado por
+          // ad blockers e proteções de rastreamento (Brave, Firefox, uBlock
+          // etc.), sem gerar nenhum erro visível — o script simplesmente
+          // nunca baixa e o post fica invisível pra sempre. Se depois de um
+          // tempo o blockquote não virou iframe, mostra um card clicável
+          // com o link em vez de deixar o espaço em branco.
+          window.setTimeout(() => {
+            if (!el.querySelector("iframe")) {
+              el.innerHTML = `
               <div class="tweet-editor-preview">
                 <div class="tweet-preview-header">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -620,8 +626,11 @@ function ArticleBody({
                 <a class="tweet-preview-url" href="${twitterUrl}" target="_blank" rel="noopener noreferrer">${twitterUrl}</a>
                 <p class="tweet-preview-note">Não foi possível carregar a prévia — toque para abrir no X</p>
               </div>`;
-          }
-        }, 4000);
+            }
+          }, 4000);
+        } catch (err) {
+          console.error("[embed-debug] ERRO ao processar tweet:", err);
+        }
       });
 
       // Padrão oficial do X for Websites (twttr.ready). Usar apenas o
