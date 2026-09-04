@@ -109,12 +109,14 @@ const TwitterNode = Node.create({
     return { tweetUrl: { default: null } };
   },
   parseHTML() {
-    return [{ tag: "div[data-tweet-url]" }];
+    return [
+      { tag: "div[data-tweet-url]", getAttrs: el => ({ tweetUrl: (el as HTMLElement).getAttribute("data-tweet-url") }) },
+    ];
   },
-  renderHTML({ HTMLAttributes }) {
+  renderHTML({ node }) {
     return [
       "div",
-      mergeAttributes({ "data-tweet-url": HTMLAttributes.tweetUrl, class: "tweet-embed-wrap" }),
+      { "data-tweet-url": node.attrs.tweetUrl ?? "", class: "tweet-embed-wrap" },
     ];
   },
   addNodeView() {
