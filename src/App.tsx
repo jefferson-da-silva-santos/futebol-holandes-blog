@@ -545,7 +545,6 @@ function SelecaoPage() {
   );
 }
 
-
 // Renderiza o corpo do artigo, ativa embeds do Twitter/Instagram e abre o lightbox ao clicar em imagens
 function ArticleBody({
   bodyHtml, body, onImageClick,
@@ -603,29 +602,33 @@ function ArticleBody({
         el.appendChild(bq);
       });
 
-      function runTwitter() {
-        (window as any).twttr?.widgets?.load(container);
-      }
-
+      // Padrão oficial do X for Websites (twttr.ready). Usar apenas o
+      // evento "onload" do <script> não é confiável: ele dispara assim que
+      // o arquivo termina de baixar, mas o objeto twttr.widgets às vezes
+      // ainda não terminou de se inicializar internamente naquele instante,
+      // fazendo o twttr.widgets.load() falhar silenciosamente (sem erro no
+      // console, sem o tweet aparecer). twttr.ready() enfileira o callback
+      // e só o executa quando o widget está de fato pronto para uso.
       const win = window as any;
-      if (win.twttr?.widgets?.load) {
-        runTwitter();
-      } else {
-        const scriptId = "twitter-wjs";
-        const existing = document.getElementById(scriptId) as HTMLScriptElement | null;
-        if (existing) {
-          // Script no DOM mas ainda carregando
-          existing.addEventListener("load", runTwitter, { once: true });
-        } else {
-          const s = document.createElement("script");
-          s.id = scriptId;
-          s.src = "https://platform.twitter.com/widgets.js";
-          s.async = true;
-          s.charset = "utf-8";
-          s.onload = runTwitter;
-          document.body.appendChild(s);
-        }
-      }
+      win.twttr = (function (d: Document, s: string, id: string) {
+        let js: HTMLScriptElement;
+        const fjs = d.getElementsByTagName(s)[0];
+        const t = win.twttr || {};
+        if (d.getElementById(id)) return t;
+        js = d.createElement(s) as HTMLScriptElement;
+        js.id = id;
+        js.async = true;
+        js.charset = "utf-8";
+        js.src = "https://platform.twitter.com/widgets.js";
+        fjs.parentNode?.insertBefore(js, fjs);
+        t._e = [];
+        t.ready = function (f: (twttr: any) => void) { t._e.push(f); };
+        return t;
+      })(document, "script", "twitter-wjs");
+
+      win.twttr.ready((twttr: any) => {
+        twttr.widgets.load(container);
+      });
     }
 
     // Instagram
