@@ -4,7 +4,7 @@ import {
   articlesApi, standingsApi, convocationApi, fixturesApi, nationsApi,
   scorersApi, configApi, menuApi, normalizeArticle, oembedApi,
   type Article, type Standing, type Convocation, type Fixture,
-  type NationsGroup, type TopScorer, type SiteConfig, type MenuItem,
+  type NationsGroup, type TopScorer, type SiteConfig, type MenuItem, type TweetFull,
 } from "./api";
 import { useToast, ToastProvider } from "./utils/toast";
 import { resolveLink } from "./utils/links";
@@ -594,24 +594,39 @@ function splitBodyIntoSegments(html: string): BodySegment[] {
 
 // Cache simples em memória: se o leitor já viu esse tweet nesta sessão do
 // navegador (voltou pra mesma matéria, por exemplo), não busca de novo.
-const tweetHtmlCache = new Map<string, string>();
+const tweetFullCache = new Map<string, TweetFull>();
+
+// Formata a data no padrão clássico do Twitter ("Sun Aug 30 12:00:00 +0000 2026").
+function formatTweetDate(raw: string | null): string {
+  if (!raw) return "";
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long", year: "numeric" }).format(d);
+}
+
+// O texto que vem da API costuma trazer, no final, o link t.co que só serve
+// pra apontar pra própria foto do post — como já mostramos a foto de verdade
+// abaixo, esse link solto no fim do texto fica redundante e é removido.
+function stripTrailingMediaLink(text: string): string {
+  return text.replace(/\s*https:\/\/t\.co\/\w+\s*$/i, "");
+}
 
 function TweetEmbed({ url }: { url: string }) {
   const [state, setState] = useState<
-    { status: "loading" } | { status: "ready"; html: string } | { status: "error" }
+    { status: "loading" } | { status: "ready"; tweet: TweetFull } | { status: "error" }
   >(() => {
-    const cached = tweetHtmlCache.get(url);
-    return cached ? { status: "ready", html: cached } : { status: "loading" };
+    const cached = tweetFullCache.get(url);
+    return cached ? { status: "ready", tweet: cached } : { status: "loading" };
   });
 
   useEffect(() => {
-    if (tweetHtmlCache.has(url)) return;
+    if (tweetFullCache.has(url)) return;
     let cancelled = false;
     setState({ status: "loading" });
-    oembedApi.twitter(url)
-      .then(({ html }) => {
-        tweetHtmlCache.set(url, html);
-        if (!cancelled) setState({ status: "ready", html });
+    oembedApi.twitterFull(url)
+      .then(tweet => {
+        tweetFullCache.set(url, tweet);
+        if (!cancelled) setState({ status: "ready", tweet });
       })
       .catch(() => {
         if (!cancelled) setState({ status: "error" });
@@ -620,7 +635,31 @@ function TweetEmbed({ url }: { url: string }) {
   }, [url]);
 
   if (state.status === "ready") {
-    return <div className="tweet-embed-wrap" dangerouslySetInnerHTML={{ __html: state.html }} />;
+    const t = state.tweet;
+    const dateLabel = formatTweetDate(t.createdAt);
+    return (
+      <a className="tweet-card" href={t.url} target="_blank" rel="noopener noreferrer">
+        <div className="tweet-card-head">
+          <span className="tweet-card-brand">𝕏</span>
+          {t.authorImage
+            ? <img className="tweet-card-avatar" src={t.authorImage} alt={t.authorName} />
+            : <span className="tweet-card-avatar tweet-card-avatar-placeholder" />}
+          <span className="tweet-card-author">
+            <span className="tweet-card-name">{t.authorName}</span>
+            {t.authorHandle && <span className="tweet-card-handle">@{t.authorHandle}</span>}
+          </span>
+        </div>
+        {t.text && <p className="tweet-card-text">{stripTrailingMediaLink(t.text)}</p>}
+        {t.photos.length > 0 && (
+          <div className={`tweet-card-photos ${t.photos.length > 1 ? "tweet-card-photos-grid" : ""}`}>
+            {t.photos.map((src, i) => (
+              <img key={i} src={src} alt="" className="tweet-card-photo" loading="lazy" />
+            ))}
+          </div>
+        )}
+        {dateLabel && <span className="tweet-card-date">{dateLabel}</span>}
+      </a>
+    );
   }
   if (state.status === "error") {
     return (

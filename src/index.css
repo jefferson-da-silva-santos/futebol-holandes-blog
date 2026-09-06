@@ -4096,55 +4096,91 @@ ol {
   border-color: #000;
 }
 
-/* Cartão real — o blockquote que vem do oEmbed do X, estilizado como um
-   post nativo: cabeçalho com "selo" do X, texto do tweet, rodapé com a data
-   como link discreto. */
-.tweet-embed-wrap blockquote.twitter-tweet {
-  margin: 0;
+/* Cartão real — montado por nós a partir dos dados completos do post
+   (autor, foto real, texto, data), não mais a partir de um blockquote do
+   oEmbed. É um link clicável inteiro pro post original no X. */
+.tweet-card {
+  display: block;
   width: 100%;
-  position: relative;
+  max-width: 460px;
   border: 1px solid var(--border);
   border-radius: 16px;
   background: var(--surface1, var(--surface2));
-  padding: 2.6rem 1.2rem 1.1rem;
-  font-size: 0.95rem;
-  line-height: 1.55;
+  overflow: hidden;
+  text-decoration: none;
   color: var(--txt1);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
 }
-/* "Selo" do X fixo no topo do cartão, imitando o cabeçalho de um post nativo */
-.tweet-embed-wrap blockquote.twitter-tweet::before {
-  content: "𝕏  Post no X";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
+.tweet-card:hover {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+  border-color: var(--txt3);
+}
+.tweet-card-head {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.75rem 1.2rem;
-  font-size: 0.78rem;
-  font-weight: 800;
-  letter-spacing: 0.01em;
-  color: #fff;
-  background: #000;
-  border-radius: 16px 16px 0 0;
+  gap: 0.55rem;
+  padding: 0.85rem 1.1rem 0.6rem;
 }
-.tweet-embed-wrap blockquote.twitter-tweet p { margin: 0 0 0.7rem; }
-.tweet-embed-wrap blockquote.twitter-tweet a {
-  color: var(--orange);
-  text-decoration: none;
+.tweet-card-brand {
+  font-size: 1rem;
+  font-weight: 900;
+  color: var(--txt1);
+  flex-shrink: 0;
 }
-.tweet-embed-wrap blockquote.twitter-tweet a:hover { text-decoration: underline; }
-/* Link da data (último link do blockquote) — discreto, como um rodapé */
-.tweet-embed-wrap blockquote.twitter-tweet a[href*="?ref_src"] {
-  display: inline-block;
-  margin-top: 0.3rem;
+.tweet-card-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--border);
+}
+.tweet-card-avatar-placeholder { background: var(--border); }
+.tweet-card-author {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+.tweet-card-name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--txt1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tweet-card-handle {
   font-size: 0.78rem;
   color: var(--txt3);
-  padding-top: 0.6rem;
-  border-top: 1px solid var(--border);
+}
+.tweet-card-text {
+  margin: 0;
+  padding: 0 1.1rem 0.8rem;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--txt1);
+  white-space: pre-line;
+}
+.tweet-card-photos { width: 100%; line-height: 0; }
+.tweet-card-photo {
   width: 100%;
+  max-height: 420px;
+  object-fit: cover;
+  display: block;
+}
+.tweet-card-photos-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+}
+.tweet-card-photos-grid .tweet-card-photo { max-height: 220px; }
+.tweet-card-date {
+  display: block;
+  padding: 0.7rem 1.1rem 0.85rem;
+  font-size: 0.76rem;
+  color: var(--txt3);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

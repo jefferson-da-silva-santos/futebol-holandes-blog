@@ -254,11 +254,24 @@ export const menuApi = {
 
 // ─── oEmbed (Twitter/X) ─────────────────────────────────────────────────────
 // O oEmbed do X não libera CORS para o navegador — por isso passamos pela
-// própria API, que busca por trás e devolve o HTML pronto do embed.
+// própria API, que busca por trás e devolve o conteúdo pronto do embed.
 export interface TweetOEmbed { html: string; authorName?: string | null; url: string; }
+export interface TweetFull {
+  text: string;
+  authorName: string;
+  authorHandle: string;
+  authorImage: string | null;
+  photos: string[];
+  createdAt: string | null;
+  url: string;
+}
 export const oembedApi = {
   twitter(url: string) {
     return request<TweetOEmbed>(`/oembed/twitter?url=${encodeURIComponent(url)}`);
+  },
+  // Versão "completa" — inclui a(s) foto(s) reais do post, não só um link pra elas.
+  twitterFull(url: string) {
+    return request<TweetFull>(`/oembed/twitter-full?url=${encodeURIComponent(url)}`);
   },
 };
 
