@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, createContext, useContext, type ReactNode } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext, type ReactNode } from "react";
 import { Routes, Route, Link, NavLink, useNavigate, useParams, Outlet } from "react-router-dom";
 import {
   articlesApi, standingsApi, convocationApi, fixturesApi, nationsApi,
@@ -546,65 +546,161 @@ function SelecaoPage() {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  EMBED DO TWITTER/X — implementação (v2, simplificada)
+//  EMBEDS DE TWITTER/X E INSTAGRAM — implementação v3
 //
-//  Como funciona, passo a passo:
-//  1. O editor (RichEditorProps.tsx) salva no HTML do artigo apenas
-//     `<div data-tweet-url="https://x.com/user/status/123...">` — nenhum
-//     conteúdo do tweet fica armazenado, só a URL.
-//  2. Quando o artigo é exibido, para cada uma dessas divs buscamos o HTML
-//     oficial do embed via oEmbed do X — mas não direto do navegador, porque
-//     o endpoint publish.twitter.com/oembed não libera CORS pra isso. Por
-//     isso a chamada passa pela nossa própria API (`oembedApi.twitter`), que
-//     busca por trás e devolve o HTML pronto (com cache de 6h no servidor).
-//  3. Esse HTML (texto do tweet, autor, data, link) é mostrado DIRETO,
-//     estilizado com nosso próprio CSS — sem carregar o widgets.js do X.
-//     Versões anteriores tentavam transformar isso num embed interativo via
-//     widgets.js, mas esse script se mostrou pouco confiável neste ambiente:
-//     ele remove o conteúdo original do DOM enquanto tenta montar um iframe
-//     e, quando falha, não sobra nada — um vazio permanente. Sem essa etapa,
-//     não existe mais essa forma de falha: o conteúdo que a API devolve é
-//     exatamente o que aparece, sempre.
-//  4. Se a busca falhar (post apagado, tornado privado, rede fora do ar),
-//     nunca deixamos a área em branco: mostramos um card com link direto
-//     pro post no X, para o leitor conseguir ver o conteúdo mesmo assim.
+//  Reescrita do zero com uma arquitetura diferente da anterior. Antes, o
+//  código injetava HTML manualmente num container via `ref` + `useEffect` +
+//  `querySelectorAll` DEPOIS do React já ter renderizado o `bodyHtml` cru
+//  (via dangerouslySetInnerHTML). Isso funcionava na teoria, mas por algum
+//  motivo não reproduzível esse efeito simplesmente não rodava em produção
+//  em alguns casos — sem nenhum erro, sem nenhuma pista.
+//
+//  Agora o `bodyHtml` é CORTADO em pedaços antes de renderizar: texto normal
+//  (ainda via dangerouslySetInnerHTML, pedaço por pedaço) e marcadores de
+//  embed, que viram COMPONENTES REACT DE VERDADE (<TweetEmbed>,
+//  <InstagramEmbed>) dentro da árvore do React — com seu próprio useState e
+//  useEffect, exatamente como qualquer outro componente que busca dados.
+//  Isso elimina de vez a dependência de manipulação manual de DOM fora do
+//  controle do React.
 // ═════════════════════════════════════════════════════════════════════════════
 
-// Cache em memória (dura enquanto a aba estiver aberta) — evita rebuscar o
-// mesmo tweet toda vez que o usuário navega de volta pro mesmo artigo.
-const tweetEmbedCache = new Map<string, Promise<{ html: string }>>();
+type BodySegment =
+  | { type: "html"; content: string }
+  | { type: "tweet"; url: string }
+  | { type: "instagram"; url: string };
 
-function getTweetEmbedHtml(url: string): Promise<{ html: string }> {
-  let pending = tweetEmbedCache.get(url);
-  if (!pending) {
-    pending = oembedApi.twitter(url).catch(err => {
-      tweetEmbedCache.delete(url); // não guarda falha — permite tentar de novo depois
-      throw err;
-    });
-    tweetEmbedCache.set(url, pending);
+// Corta o bodyHtml nos marcadores `<div data-tweet-url="...">` e
+// `<div data-instagram-url="...">` que o editor grava, preservando tudo o
+// resto como HTML normal.
+function splitBodyIntoSegments(html: string): BodySegment[] {
+  const markerRe = /<div[^>]*\bdata-(tweet-url|instagram-url)="([^"]*)"[^>]*>\s*<\/div>/g;
+  const segments: BodySegment[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = markerRe.exec(html)) !== null) {
+    if (match.index > lastIndex) {
+      segments.push({ type: "html", content: html.slice(lastIndex, match.index) });
+    }
+    const kind = match[1] === "tweet-url" ? "tweet" : "instagram";
+    segments.push({ type: kind, url: match[2] } as BodySegment);
+    lastIndex = markerRe.lastIndex;
   }
-  return pending;
+  if (lastIndex < html.length) {
+    segments.push({ type: "html", content: html.slice(lastIndex) });
+  }
+  return segments;
 }
 
-function renderTweetFallback(url: string): string {
-  return `
-    <a class="tweet-embed-fallback" href="${url}" target="_blank" rel="noopener noreferrer">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-      </svg>
-      <span>Ver publicação no X</span>
-    </a>`;
+// Cache simples em memória: se o leitor já viu esse tweet nesta sessão do
+// navegador (voltou pra mesma matéria, por exemplo), não busca de novo.
+const tweetHtmlCache = new Map<string, string>();
+
+function TweetEmbed({ url }: { url: string }) {
+  const [state, setState] = useState<
+    { status: "loading" } | { status: "ready"; html: string } | { status: "error" }
+  >(() => {
+    const cached = tweetHtmlCache.get(url);
+    return cached ? { status: "ready", html: cached } : { status: "loading" };
+  });
+
+  useEffect(() => {
+    if (tweetHtmlCache.has(url)) return;
+    let cancelled = false;
+    setState({ status: "loading" });
+    oembedApi.twitter(url)
+      .then(({ html }) => {
+        tweetHtmlCache.set(url, html);
+        if (!cancelled) setState({ status: "ready", html });
+      })
+      .catch(() => {
+        if (!cancelled) setState({ status: "error" });
+      });
+    return () => { cancelled = true; };
+  }, [url]);
+
+  if (state.status === "ready") {
+    return <div className="tweet-embed-wrap" dangerouslySetInnerHTML={{ __html: state.html }} />;
+  }
+  if (state.status === "error") {
+    return (
+      <div className="tweet-embed-wrap">
+        <a className="tweet-embed-fallback" href={url} target="_blank" rel="noopener noreferrer">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+          </svg>
+          <span>Ver publicação no X</span>
+        </a>
+      </div>
+    );
+  }
+  return (
+    <div className="tweet-embed-wrap">
+      <div className="tweet-embed-skeleton">
+        <div className="tweet-skeleton-avatar" />
+        <div className="tweet-skeleton-lines">
+          <div className="tweet-skeleton-line" />
+          <div className="tweet-skeleton-line short" />
+        </div>
+      </div>
+    </div>
+  );
 }
 
-function renderTweetSkeleton(): string {
-  return `
-    <div class="tweet-embed-skeleton">
-      <div class="tweet-skeleton-line"></div>
-      <div class="tweet-skeleton-line short"></div>
-    </div>`;
+// Carrega o embed.js do Instagram uma única vez por página.
+let instagramScriptPromise: Promise<void> | null = null;
+function loadInstagramScript(): Promise<void> {
+  const win = window as any;
+  if (win.instgrm?.Embeds?.process) return Promise.resolve();
+  if (instagramScriptPromise) return instagramScriptPromise;
+  instagramScriptPromise = new Promise(resolve => {
+    const id = "instagram-wjs";
+    const existing = document.getElementById(id) as HTMLScriptElement | null;
+    if (existing) {
+      existing.addEventListener("load", () => resolve(), { once: true });
+      return;
+    }
+    const s = document.createElement("script");
+    s.id = id;
+    s.src = "https://www.instagram.com/embed.js";
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => resolve();
+    document.body.appendChild(s);
+  });
+  return instagramScriptPromise;
 }
 
-// Renderiza o corpo do artigo, ativa embeds do Twitter/Instagram e abre o lightbox ao clicar em imagens
+function InstagramEmbed({ url }: { url: string }) {
+  const ref = useRef<HTMLQuoteElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadInstagramScript().then(() => {
+      if (cancelled) return;
+      (window as any).instgrm?.Embeds?.process();
+    });
+    return () => { cancelled = true; };
+  }, [url]);
+
+  return (
+    <div className="instagram-embed-wrap">
+      <blockquote
+        ref={ref}
+        className="instagram-media"
+        data-instgrm-captioned=""
+        data-instgrm-permalink={url}
+        data-instgrm-version="14"
+        style={{ margin: "0 auto" }}
+      >
+        <a href={url} target="_blank" rel="noopener noreferrer">Ver publicação no Instagram</a>
+      </blockquote>
+    </div>
+  );
+}
+
+// Renderiza o corpo do artigo: pedaços de HTML normal + embeds como
+// componentes React de verdade, e abre o lightbox ao clicar em imagens.
 function ArticleBody({
   bodyHtml, body, onImageClick,
 }: {
@@ -612,102 +708,24 @@ function ArticleBody({
   body: string[];
   onImageClick: (img: LightboxData) => void;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
+  const segments = useMemo(() => (bodyHtml ? splitBodyIntoSegments(bodyHtml) : []), [bodyHtml]);
 
-  // Lightbox — depende de onImageClick
-  useEffect(() => {
-    if (!bodyHtml || !ref.current) return;
-    const container = ref.current;
-    function handleClick(e: MouseEvent) {
-      const target = e.target as HTMLElement;
-      if (target.tagName === "IMG" && target.classList.contains("re-img")) {
-        const img = target as HTMLImageElement;
-        onImageClick({ src: img.currentSrc || img.src, alt: img.alt || "" });
-      }
+  function handleClick(e: React.MouseEvent<HTMLDivElement>) {
+    const target = e.target as HTMLElement;
+    if (target.tagName === "IMG" && target.classList.contains("re-img")) {
+      const img = target as HTMLImageElement;
+      onImageClick({ src: img.currentSrc || img.src, alt: img.alt || "" });
     }
-    container.addEventListener("click", handleClick);
-    return () => { container.removeEventListener("click", handleClick); };
-  }, [bodyHtml, onImageClick]);
-
-  // Embed do Twitter/X — busca o HTML oficial via nossa API (oEmbed) e
-  // mostra direto, sem depender do widgets.js do X. Depende só do bodyHtml.
-  useEffect(() => {
-    if (!bodyHtml || !ref.current) return;
-    const container = ref.current;
-
-    const tweetDivs = Array.from(container.querySelectorAll<HTMLElement>("[data-tweet-url]"));
-    if (tweetDivs.length === 0) return;
-
-    let cancelled = false;
-
-    // Mostra um esqueleto de carregamento imediatamente, antes de qualquer
-    // chamada de rede, para nunca deixar um vazio "piscando" na tela.
-    tweetDivs.forEach(el => { el.innerHTML = renderTweetSkeleton(); });
-
-    (async () => {
-      await Promise.all(tweetDivs.map(async el => {
-        const url = el.getAttribute("data-tweet-url");
-        if (!url) return;
-        try {
-          const { html } = await getTweetEmbedHtml(url);
-          if (cancelled) return;
-          // Mostra o conteúdo real (texto, autor, data, link) direto —
-          // estilizado pelo nosso CSS, sem nenhum script externo depois
-          // disso que possa apagar ou esconder o que acabamos de colocar.
-          el.innerHTML = html;
-        } catch {
-          if (cancelled) return;
-          // Post apagado, tornado privado, ou erro de rede: mostra um link
-          // direto em vez de deixar a área do artigo em branco.
-          el.innerHTML = renderTweetFallback(url);
-        }
-      }));
-    })();
-
-    return () => { cancelled = true; };
-  }, [bodyHtml]);
-
-  // Embed do Instagram — depende só do bodyHtml
-  useEffect(() => {
-    if (!bodyHtml || !ref.current) return;
-    const container = ref.current;
-
-    // Instagram
-    const igDivs = container.querySelectorAll<HTMLElement>("[data-instagram-url]");
-    if (igDivs.length > 0) {
-      igDivs.forEach(el => {
-        const url = el.getAttribute("data-instagram-url");
-        if (!url) return;
-        el.innerHTML = "";
-        const bq = document.createElement("blockquote");
-        bq.className = "instagram-media";
-        bq.setAttribute("data-instgrm-captioned", "");
-        bq.setAttribute("data-instgrm-permalink", url);
-        bq.setAttribute("data-instgrm-version", "14");
-        bq.style.margin = "0 auto";
-        el.appendChild(bq);
-      });
-      const win = window as any;
-      if (win.instgrm?.Embeds?.process) {
-        win.instgrm.Embeds.process();
-      } else {
-        const scriptId = "instagram-wjs";
-        if (!document.getElementById(scriptId)) {
-          const s = document.createElement("script");
-          s.id = scriptId;
-          s.src = "https://www.instagram.com/embed.js";
-          s.async = true;
-          s.onload = () => { (window as any).instgrm?.Embeds?.process(); };
-          document.body.appendChild(s);
-        }
-      }
-    }
-  }, [bodyHtml]);
+  }
 
   if (bodyHtml) {
     return (
-      <div className="art-body">
-        <div ref={ref} dangerouslySetInnerHTML={{ __html: bodyHtml }} />
+      <div className="art-body" onClick={handleClick}>
+        {segments.map((seg, i) => {
+          if (seg.type === "tweet") return <TweetEmbed key={i} url={seg.url} />;
+          if (seg.type === "instagram") return <InstagramEmbed key={i} url={seg.url} />;
+          return <div key={i} dangerouslySetInnerHTML={{ __html: seg.content }} />;
+        })}
       </div>
     );
   }
