@@ -546,7 +546,7 @@ function SelecaoPage() {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  EMBED DO TWITTER/X — implementação completa
+//  EMBED DO TWITTER/X — implementação (v2, simplificada)
 //
 //  Como funciona, passo a passo:
 //  1. O editor (RichEditorProps.tsx) salva no HTML do artigo apenas
@@ -557,10 +557,14 @@ function SelecaoPage() {
 //     o endpoint publish.twitter.com/oembed não libera CORS pra isso. Por
 //     isso a chamada passa pela nossa própria API (`oembedApi.twitter`), que
 //     busca por trás e devolve o HTML pronto (com cache de 6h no servidor).
-//  3. Com o HTML do embed já no DOM, carregamos (uma única vez por página)
-//     o script https://platform.twitter.com/widgets.js e chamamos
-//     `twttr.widgets.load()`, que é o que transforma o blockquote estático
-//     num embed interativo de verdade.
+//  3. Esse HTML (texto do tweet, autor, data, link) é mostrado DIRETO,
+//     estilizado com nosso próprio CSS — sem carregar o widgets.js do X.
+//     Versões anteriores tentavam transformar isso num embed interativo via
+//     widgets.js, mas esse script se mostrou pouco confiável neste ambiente:
+//     ele remove o conteúdo original do DOM enquanto tenta montar um iframe
+//     e, quando falha, não sobra nada — um vazio permanente. Sem essa etapa,
+//     não existe mais essa forma de falha: o conteúdo que a API devolve é
+//     exatamente o que aparece, sempre.
 //  4. Se a busca falhar (post apagado, tornado privado, rede fora do ar),
 //     nunca deixamos a área em branco: mostramos um card com link direto
 //     pro post no X, para o leitor conseguir ver o conteúdo mesmo assim.
@@ -582,36 +586,6 @@ function getTweetEmbedHtml(url: string): Promise<{ html: string }> {
   return pending;
 }
 
-// Carrega o widgets.js do X uma única vez por página, não importa quantos
-// artigos/embeds sejam renderizados durante a navegação da SPA.
-let twitterWidgetsScriptPromise: Promise<void> | null = null;
-
-function loadTwitterWidgetsScript(): Promise<void> {
-  const win = window as any;
-  if (win.twttr?.widgets?.load) return Promise.resolve();
-  if (twitterWidgetsScriptPromise) return twitterWidgetsScriptPromise;
-
-  twitterWidgetsScriptPromise = new Promise(resolve => {
-    const scriptId = "twitter-wjs";
-    const existing = document.getElementById(scriptId) as HTMLScriptElement | null;
-    if (existing) {
-      existing.addEventListener("load", () => resolve(), { once: true });
-      return;
-    }
-    const s = document.createElement("script");
-    s.id = scriptId;
-    s.src = "https://platform.twitter.com/widgets.js";
-    s.async = true;
-    s.charset = "utf-8";
-    s.onload = () => resolve();
-    // Se o script falhar em carregar, resolve mesmo assim: o fallback com
-    // link direto já foi renderizado, então a página não fica travada.
-    s.onerror = () => resolve();
-    document.body.appendChild(s);
-  });
-  return twitterWidgetsScriptPromise;
-}
-
 function renderTweetFallback(url: string): string {
   return `
     <a class="tweet-embed-fallback" href="${url}" target="_blank" rel="noopener noreferrer">
@@ -628,35 +602,6 @@ function renderTweetSkeleton(): string {
       <div class="tweet-skeleton-line"></div>
       <div class="tweet-skeleton-line short"></div>
     </div>`;
-}
-
-// O widgets.js do X, ao processar um <blockquote class="twitter-tweet">,
-// não apenas esconde o blockquote original: ele REMOVE esse elemento do DOM
-// enquanto tenta montar o iframe interativo no lugar. Se esse iframe falhar
-// (bloqueador de anúncios, instabilidade do X, rede), o elemento original já
-// foi removido e não sobra nada — um vazio permanente, mesmo com o conteúdo
-// certo tendo chegado da nossa API. Por isso guardamos uma cópia do
-// blockquote ANTES de deixar o widgets.js mexer nele: se depois de um tempo
-// razoável nenhum iframe tiver aparecido, reinserimos essa cópia salva.
-function watchTweetVisibility(el: HTMLElement, savedClone: HTMLElement | null, isCancelled: () => boolean) {
-  setTimeout(() => {
-    if (isCancelled()) return;
-    if (el.querySelector("iframe")) return; // widget interativo montou normalmente
-
-    const bq = el.querySelector<HTMLElement>("blockquote.twitter-tweet");
-    if (bq) {
-      // Ainda está lá, só escondido — garante que fique visível
-      bq.style.removeProperty("display");
-      bq.style.removeProperty("visibility");
-      return;
-    }
-    // O widgets.js removeu o blockquote original e não conseguiu colocar o
-    // iframe no lugar: reinserimos a cópia que guardamos antes.
-    if (savedClone) {
-      el.innerHTML = "";
-      el.appendChild(savedClone);
-    }
-  }, 6000);
 }
 
 // Renderiza o corpo do artigo, ativa embeds do Twitter/Instagram e abre o lightbox ao clicar em imagens
@@ -684,8 +629,8 @@ function ArticleBody({
     return () => { container.removeEventListener("click", handleClick); };
   }, [bodyHtml, onImageClick]);
 
-  // Embed do Twitter/X — busca o HTML oficial via nossa API (oEmbed) e só
-  // depois carrega o widgets.js para hidratar. Depende só do bodyHtml.
+  // Embed do Twitter/X — busca o HTML oficial via nossa API (oEmbed) e
+  // mostra direto, sem depender do widgets.js do X. Depende só do bodyHtml.
   useEffect(() => {
     if (!bodyHtml || !ref.current) return;
     const container = ref.current;
@@ -706,13 +651,10 @@ function ArticleBody({
         try {
           const { html } = await getTweetEmbedHtml(url);
           if (cancelled) return;
+          // Mostra o conteúdo real (texto, autor, data, link) direto —
+          // estilizado pelo nosso CSS, sem nenhum script externo depois
+          // disso que possa apagar ou esconder o que acabamos de colocar.
           el.innerHTML = html;
-          // Guarda uma cópia do conteúdo real ANTES de deixar o widgets.js
-          // mexer nele — se ele remover o blockquote e falhar em montar o
-          // iframe, usamos essa cópia pra nunca deixar a área vazia.
-          const bq = el.querySelector<HTMLElement>("blockquote.twitter-tweet");
-          const savedClone = bq ? (bq.cloneNode(true) as HTMLElement) : null;
-          watchTweetVisibility(el, savedClone, () => cancelled);
         } catch {
           if (cancelled) return;
           // Post apagado, tornado privado, ou erro de rede: mostra um link
@@ -720,11 +662,6 @@ function ArticleBody({
           el.innerHTML = renderTweetFallback(url);
         }
       }));
-
-      if (cancelled) return;
-      await loadTwitterWidgetsScript();
-      if (cancelled) return;
-      (window as any).twttr?.widgets?.load(container);
     })();
 
     return () => { cancelled = true; };

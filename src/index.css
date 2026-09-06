@@ -4084,13 +4084,15 @@ ol {
   border-color: var(--orange);
 }
 
-/* Estilo do blockquote real vindo do oEmbed, para quando ele fica visível
-   sem o iframe interativo do widgets.js (ver watchTweetVisibility no App.tsx) */
+/* Estilo do blockquote real vindo do oEmbed — esse é o resultado final
+   exibido no site (ver comentário no App.tsx sobre por que não usamos mais
+   o widgets.js do X para virar embed interativo) */
 .tweet-embed-wrap blockquote.twitter-tweet {
   margin: 0;
   width: 100%;
   max-width: 500px;
   border: 1px solid var(--border);
+  border-left: 3px solid #1d9bf0;
   border-radius: var(--r-lg);
   background: var(--surface2);
   padding: 1rem 1.1rem;
@@ -4098,11 +4100,17 @@ ol {
   line-height: 1.6;
   color: var(--txt1);
 }
-.tweet-embed-wrap blockquote.twitter-tweet p { margin: 0 0 0.6rem; }
+.tweet-embed-wrap blockquote.twitter-tweet p { margin: 0 0 0.7rem; }
 .tweet-embed-wrap blockquote.twitter-tweet a {
-  color: var(--orange);
-  text-decoration: underline;
-  text-underline-offset: 2px;
+  color: #1d9bf0;
+  text-decoration: none;
+}
+.tweet-embed-wrap blockquote.twitter-tweet a:hover { text-decoration: underline; }
+/* A última linha do blockquote (autor — link com a data) vem separada por
+   "—" no HTML do oEmbed; deixamos menor e mais discreta que o texto do tweet */
+.tweet-embed-wrap blockquote.twitter-tweet a[href*="?ref_src"] {
+  font-size: 0.8rem;
+  color: var(--txt3);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
