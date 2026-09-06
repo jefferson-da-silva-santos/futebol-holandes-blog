@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, createContext, useContext, ty
 import { Routes, Route, Link, NavLink, useNavigate, useParams, Outlet } from "react-router-dom";
 import {
   articlesApi, standingsApi, convocationApi, fixturesApi, nationsApi,
-  scorersApi, configApi, menuApi, normalizeArticle,
+  scorersApi, configApi, menuApi, normalizeArticle, oembedApi,
   type Article, type Standing, type Convocation, type Fixture,
   type NationsGroup, type TopScorer, type SiteConfig, type MenuItem,
 } from "./api";
@@ -545,6 +545,91 @@ function SelecaoPage() {
   );
 }
 
+// ═════════════════════════════════════════════════════════════════════════════
+//  EMBED DO TWITTER/X — implementação completa
+//
+//  Como funciona, passo a passo:
+//  1. O editor (RichEditorProps.tsx) salva no HTML do artigo apenas
+//     `<div data-tweet-url="https://x.com/user/status/123...">` — nenhum
+//     conteúdo do tweet fica armazenado, só a URL.
+//  2. Quando o artigo é exibido, para cada uma dessas divs buscamos o HTML
+//     oficial do embed via oEmbed do X — mas não direto do navegador, porque
+//     o endpoint publish.twitter.com/oembed não libera CORS pra isso. Por
+//     isso a chamada passa pela nossa própria API (`oembedApi.twitter`), que
+//     busca por trás e devolve o HTML pronto (com cache de 6h no servidor).
+//  3. Com o HTML do embed já no DOM, carregamos (uma única vez por página)
+//     o script https://platform.twitter.com/widgets.js e chamamos
+//     `twttr.widgets.load()`, que é o que transforma o blockquote estático
+//     num embed interativo de verdade.
+//  4. Se a busca falhar (post apagado, tornado privado, rede fora do ar),
+//     nunca deixamos a área em branco: mostramos um card com link direto
+//     pro post no X, para o leitor conseguir ver o conteúdo mesmo assim.
+// ═════════════════════════════════════════════════════════════════════════════
+
+// Cache em memória (dura enquanto a aba estiver aberta) — evita rebuscar o
+// mesmo tweet toda vez que o usuário navega de volta pro mesmo artigo.
+const tweetEmbedCache = new Map<string, Promise<{ html: string }>>();
+
+function getTweetEmbedHtml(url: string): Promise<{ html: string }> {
+  let pending = tweetEmbedCache.get(url);
+  if (!pending) {
+    pending = oembedApi.twitter(url).catch(err => {
+      tweetEmbedCache.delete(url); // não guarda falha — permite tentar de novo depois
+      throw err;
+    });
+    tweetEmbedCache.set(url, pending);
+  }
+  return pending;
+}
+
+// Carrega o widgets.js do X uma única vez por página, não importa quantos
+// artigos/embeds sejam renderizados durante a navegação da SPA.
+let twitterWidgetsScriptPromise: Promise<void> | null = null;
+
+function loadTwitterWidgetsScript(): Promise<void> {
+  const win = window as any;
+  if (win.twttr?.widgets?.load) return Promise.resolve();
+  if (twitterWidgetsScriptPromise) return twitterWidgetsScriptPromise;
+
+  twitterWidgetsScriptPromise = new Promise(resolve => {
+    const scriptId = "twitter-wjs";
+    const existing = document.getElementById(scriptId) as HTMLScriptElement | null;
+    if (existing) {
+      existing.addEventListener("load", () => resolve(), { once: true });
+      return;
+    }
+    const s = document.createElement("script");
+    s.id = scriptId;
+    s.src = "https://platform.twitter.com/widgets.js";
+    s.async = true;
+    s.charset = "utf-8";
+    s.onload = () => resolve();
+    // Se o script falhar em carregar, resolve mesmo assim: o fallback com
+    // link direto já foi renderizado, então a página não fica travada.
+    s.onerror = () => resolve();
+    document.body.appendChild(s);
+  });
+  return twitterWidgetsScriptPromise;
+}
+
+function renderTweetFallback(url: string): string {
+  return `
+    <a class="tweet-embed-fallback" href="${url}" target="_blank" rel="noopener noreferrer">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+      </svg>
+      <span>Ver publicação no X</span>
+    </a>`;
+}
+
+function renderTweetSkeleton(): string {
+  return `
+    <div class="tweet-embed-skeleton">
+      <div class="tweet-skeleton-line"></div>
+      <div class="tweet-skeleton-line short"></div>
+    </div>`;
+}
+
 // Renderiza o corpo do artigo, ativa embeds do Twitter/Instagram e abre o lightbox ao clicar em imagens
 function ArticleBody({
   bodyHtml, body, onImageClick,
@@ -570,55 +655,50 @@ function ArticleBody({
     return () => { container.removeEventListener("click", handleClick); };
   }, [bodyHtml, onImageClick]);
 
-  // Embeds Twitter/Instagram — depende só do bodyHtml
+  // Embed do Twitter/X — busca o HTML oficial via nossa API (oEmbed) e só
+  // depois carrega o widgets.js para hidratar. Depende só do bodyHtml.
   useEffect(() => {
     if (!bodyHtml || !ref.current) return;
     const container = ref.current;
 
-    // Twitter/X
-    const tweetDivs = container.querySelectorAll<HTMLElement>("[data-tweet-url]");
-    if (tweetDivs.length > 0) {
-      tweetDivs.forEach(el => {
+    const tweetDivs = Array.from(container.querySelectorAll<HTMLElement>("[data-tweet-url]"));
+    if (tweetDivs.length === 0) return;
+
+    let cancelled = false;
+
+    // Mostra um esqueleto de carregamento imediatamente, antes de qualquer
+    // chamada de rede, para nunca deixar um vazio "piscando" na tela.
+    tweetDivs.forEach(el => { el.innerHTML = renderTweetSkeleton(); });
+
+    (async () => {
+      await Promise.all(tweetDivs.map(async el => {
         const url = el.getAttribute("data-tweet-url");
         if (!url) return;
-        // Sempre reconstrói para garantir que o widget processe
-        el.innerHTML = "";
-        const bq = document.createElement("blockquote");
-        bq.className = "twitter-tweet";
-        bq.setAttribute("data-lang", "pt");
-        bq.setAttribute("data-dnt", "true");
-        bq.setAttribute("data-theme", "light");
-        const a = document.createElement("a");
-        a.href = url;
-        a.textContent = url;
-        bq.appendChild(a);
-        el.appendChild(bq);
-      });
-
-      function runTwitter() {
-        (window as any).twttr?.widgets?.load(container);
-      }
-
-      const win = window as any;
-      if (win.twttr?.widgets?.load) {
-        runTwitter();
-      } else {
-        const scriptId = "twitter-wjs";
-        const existing = document.getElementById(scriptId) as HTMLScriptElement | null;
-        if (existing) {
-          // Script no DOM mas ainda carregando
-          existing.addEventListener("load", runTwitter, { once: true });
-        } else {
-          const s = document.createElement("script");
-          s.id = scriptId;
-          s.src = "https://platform.twitter.com/widgets.js";
-          s.async = true;
-          s.charset = "utf-8";
-          s.onload = runTwitter;
-          document.body.appendChild(s);
+        try {
+          const { html } = await getTweetEmbedHtml(url);
+          if (cancelled) return;
+          el.innerHTML = html;
+        } catch {
+          if (cancelled) return;
+          // Post apagado, tornado privado, ou erro de rede: mostra um link
+          // direto em vez de deixar a área do artigo em branco.
+          el.innerHTML = renderTweetFallback(url);
         }
-      }
-    }
+      }));
+
+      if (cancelled) return;
+      await loadTwitterWidgetsScript();
+      if (cancelled) return;
+      (window as any).twttr?.widgets?.load(container);
+    })();
+
+    return () => { cancelled = true; };
+  }, [bodyHtml]);
+
+  // Embed do Instagram — depende só do bodyHtml
+  useEffect(() => {
+    if (!bodyHtml || !ref.current) return;
+    const container = ref.current;
 
     // Instagram
     const igDivs = container.querySelectorAll<HTMLElement>("[data-instagram-url]");

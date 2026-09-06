@@ -4035,6 +4035,56 @@ ol {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   EMBED DO TWITTER/X NO SITE — esqueleto de carregamento e fallback de erro
+   ═══════════════════════════════════════════════════════════════════════════ */
+.tweet-embed-skeleton {
+  width: 100%;
+  max-width: 500px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface2);
+  padding: 1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.tweet-skeleton-line {
+  height: 12px;
+  border-radius: 6px;
+  width: 100%;
+  background: linear-gradient(90deg, var(--border) 25%, var(--surface3, var(--border)) 50%, var(--border) 75%);
+  background-size: 200% 100%;
+  animation: tweet-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+.tweet-skeleton-line.short { width: 55%; }
+@keyframes tweet-skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.tweet-embed-fallback {
+  width: 100%;
+  max-width: 500px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface2);
+  color: var(--txt1);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.tweet-embed-fallback:hover {
+  background: var(--surface3, var(--surface2));
+  border-color: var(--orange);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    FH-TOAST — Notificações nativas (prefixo fh- sem conflito)
    ═══════════════════════════════════════════════════════════════════════════ */
 .fh-toast-container {

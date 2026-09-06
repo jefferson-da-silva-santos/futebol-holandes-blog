@@ -96,8 +96,10 @@ const YouTubeNode = Node.create({
 //  Salva a URL do tweet; no site, renderiza via Twitter Widget JS
 // ═════════════════════════════════════════════════════════════════════════════
 function getTweetUrl(input: string): string | null {
-  const m = input.match(/https?:\/\/(twitter\.com|x\.com)\/[^/]+\/status\/(\d+)/);
-  return m ? m[0].replace("twitter.com", "x.com") : null;
+  // Aceita twitter.com/x.com, com ou sem www./mobile., "status" ou "statuses",
+  // e ignora qualquer query string (?s=20 etc.) ou texto colado junto.
+  const m = input.match(/https?:\/\/(?:www\.|mobile\.)?(?:twitter\.com|x\.com)\/([^/\s?]+)\/status(?:es)?\/(\d+)/i);
+  return m ? `https://x.com/${m[1]}/status/${m[2]}` : null;
 }
 
 const TwitterNode = Node.create({

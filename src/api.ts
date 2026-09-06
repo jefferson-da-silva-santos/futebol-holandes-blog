@@ -252,6 +252,16 @@ export const menuApi = {
   },
 };
 
+// ─── oEmbed (Twitter/X) ─────────────────────────────────────────────────────
+// O oEmbed do X não libera CORS para o navegador — por isso passamos pela
+// própria API, que busca por trás e devolve o HTML pronto do embed.
+export interface TweetOEmbed { html: string; authorName?: string | null; url: string; }
+export const oembedApi = {
+  twitter(url: string) {
+    return request<TweetOEmbed>(`/oembed/twitter?url=${encodeURIComponent(url)}`);
+  },
+};
+
 // ─── Seed ─────────────────────────────────────────────────────────────────────
 export function seedDatabase() { return request<{ message: string }>("/seed", { method: "POST" }); }
 
