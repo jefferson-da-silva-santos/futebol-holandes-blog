@@ -631,21 +631,30 @@ function renderTweetSkeleton(): string {
 }
 
 // O widgets.js do X, ao processar um <blockquote class="twitter-tweet">,
-// esconde o blockquote original enquanto monta o iframe interativo por
-// trás. Se esse iframe falhar (bloqueador de anúncios, instabilidade do X,
-// rede), o blockquote fica escondido para sempre e a área do embed vira um
-// vazio permanente — mesmo com o conteúdo certo já injetado no DOM. Esta
-// função garante que isso nunca aconteça: espera um tempo razoável pelo
-// iframe e, se ele não aparecer, força o conteúdo estático (que já veio
-// certo da nossa API) a ficar visível, estilizado pelo nosso próprio CSS.
-function watchTweetVisibility(el: HTMLElement, isCancelled: () => boolean) {
+// não apenas esconde o blockquote original: ele REMOVE esse elemento do DOM
+// enquanto tenta montar o iframe interativo no lugar. Se esse iframe falhar
+// (bloqueador de anúncios, instabilidade do X, rede), o elemento original já
+// foi removido e não sobra nada — um vazio permanente, mesmo com o conteúdo
+// certo tendo chegado da nossa API. Por isso guardamos uma cópia do
+// blockquote ANTES de deixar o widgets.js mexer nele: se depois de um tempo
+// razoável nenhum iframe tiver aparecido, reinserimos essa cópia salva.
+function watchTweetVisibility(el: HTMLElement, savedClone: HTMLElement | null, isCancelled: () => boolean) {
   setTimeout(() => {
     if (isCancelled()) return;
     if (el.querySelector("iframe")) return; // widget interativo montou normalmente
+
     const bq = el.querySelector<HTMLElement>("blockquote.twitter-tweet");
     if (bq) {
+      // Ainda está lá, só escondido — garante que fique visível
       bq.style.removeProperty("display");
       bq.style.removeProperty("visibility");
+      return;
+    }
+    // O widgets.js removeu o blockquote original e não conseguiu colocar o
+    // iframe no lugar: reinserimos a cópia que guardamos antes.
+    if (savedClone) {
+      el.innerHTML = "";
+      el.appendChild(savedClone);
     }
   }, 6000);
 }
@@ -698,10 +707,12 @@ function ArticleBody({
           const { html } = await getTweetEmbedHtml(url);
           if (cancelled) return;
           el.innerHTML = html;
-          // Vigia se o widget interativo (iframe) realmente aparece depois
-          // que o widgets.js rodar; se não aparecer, mantém o conteúdo
-          // estático visível em vez de deixar em branco.
-          watchTweetVisibility(el, () => cancelled);
+          // Guarda uma cópia do conteúdo real ANTES de deixar o widgets.js
+          // mexer nele — se ele remover o blockquote e falhar em montar o
+          // iframe, usamos essa cópia pra nunca deixar a área vazia.
+          const bq = el.querySelector<HTMLElement>("blockquote.twitter-tweet");
+          const savedClone = bq ? (bq.cloneNode(true) as HTMLElement) : null;
+          watchTweetVisibility(el, savedClone, () => cancelled);
         } catch {
           if (cancelled) return;
           // Post apagado, tornado privado, ou erro de rede: mostra um link
