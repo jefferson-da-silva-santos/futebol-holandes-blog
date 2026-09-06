@@ -658,6 +658,8 @@ function ArticleBody({
   // Embed do Twitter/X — busca o HTML oficial via nossa API (oEmbed) e só
   // depois carrega o widgets.js para hidratar. Depende só do bodyHtml.
   useEffect(() => {
+    // DIAGNÓSTICO TEMPORÁRIO — remover depois de identificar o problema
+    console.log("[embed-debug] efeito rodou. bodyHtml existe?", !!bodyHtml, "ref.current existe?", !!ref.current);
     if (!bodyHtml || !ref.current) return;
     const container = ref.current;
 
@@ -714,6 +716,22 @@ function ArticleBody({
         bq.setAttribute("data-instgrm-version", "14");
         bq.style.margin = "0 auto";
         el.appendChild(bq);
+
+        // Mesmo fallback do Twitter/X: embed.js do Instagram também é
+        // alvo comum de bloqueadores de rastreamento.
+        window.setTimeout(() => {
+          if (!el.querySelector("iframe")) {
+            el.innerHTML = `
+              <div class="tweet-editor-preview">
+                <div class="tweet-preview-header">
+                  <i class="bx bxl-instagram" style="font-size:18px;color:#E1306C"></i>
+                  <strong>Post do Instagram</strong>
+                </div>
+                <a class="tweet-preview-url" href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>
+                <p class="tweet-preview-note">Não foi possível carregar a prévia — toque para abrir no Instagram</p>
+              </div>`;
+          }
+        }, 4000);
       });
       const win = window as any;
       if (win.instgrm?.Embeds?.process) {
