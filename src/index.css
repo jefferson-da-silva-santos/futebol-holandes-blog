@@ -4084,6 +4084,27 @@ ol {
   border-color: var(--orange);
 }
 
+/* Estilo do blockquote real vindo do oEmbed, para quando ele fica visível
+   sem o iframe interativo do widgets.js (ver watchTweetVisibility no App.tsx) */
+.tweet-embed-wrap blockquote.twitter-tweet {
+  margin: 0;
+  width: 100%;
+  max-width: 500px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface2);
+  padding: 1rem 1.1rem;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: var(--txt1);
+}
+.tweet-embed-wrap blockquote.twitter-tweet p { margin: 0 0 0.6rem; }
+.tweet-embed-wrap blockquote.twitter-tweet a {
+  color: var(--orange);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    FH-TOAST — Notificações nativas (prefixo fh- sem conflito)
    ═══════════════════════════════════════════════════════════════════════════ */

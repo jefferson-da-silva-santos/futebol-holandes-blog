@@ -630,6 +630,26 @@ function renderTweetSkeleton(): string {
     </div>`;
 }
 
+// O widgets.js do X, ao processar um <blockquote class="twitter-tweet">,
+// esconde o blockquote original enquanto monta o iframe interativo por
+// trás. Se esse iframe falhar (bloqueador de anúncios, instabilidade do X,
+// rede), o blockquote fica escondido para sempre e a área do embed vira um
+// vazio permanente — mesmo com o conteúdo certo já injetado no DOM. Esta
+// função garante que isso nunca aconteça: espera um tempo razoável pelo
+// iframe e, se ele não aparecer, força o conteúdo estático (que já veio
+// certo da nossa API) a ficar visível, estilizado pelo nosso próprio CSS.
+function watchTweetVisibility(el: HTMLElement, isCancelled: () => boolean) {
+  setTimeout(() => {
+    if (isCancelled()) return;
+    if (el.querySelector("iframe")) return; // widget interativo montou normalmente
+    const bq = el.querySelector<HTMLElement>("blockquote.twitter-tweet");
+    if (bq) {
+      bq.style.removeProperty("display");
+      bq.style.removeProperty("visibility");
+    }
+  }, 6000);
+}
+
 // Renderiza o corpo do artigo, ativa embeds do Twitter/Instagram e abre o lightbox ao clicar em imagens
 function ArticleBody({
   bodyHtml, body, onImageClick,
@@ -658,8 +678,6 @@ function ArticleBody({
   // Embed do Twitter/X — busca o HTML oficial via nossa API (oEmbed) e só
   // depois carrega o widgets.js para hidratar. Depende só do bodyHtml.
   useEffect(() => {
-    // DIAGNÓSTICO TEMPORÁRIO — remover depois de identificar o problema
-    console.log("[embed-debug] efeito rodou. bodyHtml existe?", !!bodyHtml, "ref.current existe?", !!ref.current);
     if (!bodyHtml || !ref.current) return;
     const container = ref.current;
 
@@ -680,6 +698,10 @@ function ArticleBody({
           const { html } = await getTweetEmbedHtml(url);
           if (cancelled) return;
           el.innerHTML = html;
+          // Vigia se o widget interativo (iframe) realmente aparece depois
+          // que o widgets.js rodar; se não aparecer, mantém o conteúdo
+          // estático visível em vez de deixar em branco.
+          watchTweetVisibility(el, () => cancelled);
         } catch {
           if (cancelled) return;
           // Post apagado, tornado privado, ou erro de rede: mostra um link
@@ -716,22 +738,6 @@ function ArticleBody({
         bq.setAttribute("data-instgrm-version", "14");
         bq.style.margin = "0 auto";
         el.appendChild(bq);
-
-        // Mesmo fallback do Twitter/X: embed.js do Instagram também é
-        // alvo comum de bloqueadores de rastreamento.
-        window.setTimeout(() => {
-          if (!el.querySelector("iframe")) {
-            el.innerHTML = `
-              <div class="tweet-editor-preview">
-                <div class="tweet-preview-header">
-                  <i class="bx bxl-instagram" style="font-size:18px;color:#E1306C"></i>
-                  <strong>Post do Instagram</strong>
-                </div>
-                <a class="tweet-preview-url" href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>
-                <p class="tweet-preview-note">Não foi possível carregar a prévia — toque para abrir no Instagram</p>
-              </div>`;
-          }
-        }, 4000);
       });
       const win = window as any;
       if (win.instgrm?.Embeds?.process) {
