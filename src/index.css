@@ -4099,7 +4099,7 @@ ol {
 /* Cartão real — montado por nós a partir dos dados completos do post
    (autor, foto real, texto, data), não mais a partir de um blockquote do
    oEmbed. É um link clicável inteiro pro post original no X. */
-.tweet-card {
+.art-body a.tweet-card {
   display: block;
   width: 100%;
   max-width: 460px;
@@ -4112,21 +4112,33 @@ ol {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   transition: box-shadow 0.15s ease, border-color 0.15s ease;
 }
-.tweet-card:hover {
+.art-body a.tweet-card:hover {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
   border-color: var(--txt3);
+  opacity: 1;
 }
 .tweet-card-head {
   display: flex;
   align-items: center;
-  gap: 0.55rem;
+  gap: 0.6rem;
   padding: 0.85rem 1.1rem 0.6rem;
 }
+.tweet-card-avatar-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
 .tweet-card-brand {
-  font-size: 1rem;
+  position: absolute;
+  bottom: -3px;
+  right: -3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: #000;
+  color: #fff;
+  font-size: 0.6rem;
   font-weight: 900;
-  color: var(--txt1);
-  flex-shrink: 0;
+  border: 2px solid var(--surface1, var(--surface2));
 }
 .tweet-card-avatar {
   width: 32px;
@@ -4157,28 +4169,48 @@ ol {
 }
 .tweet-card-text {
   margin: 0;
-  padding: 0 1.1rem 0.8rem;
+  padding: 0 1.1rem 0.85rem;
   font-size: 0.92rem;
   line-height: 1.5;
   color: var(--txt1);
   white-space: pre-line;
 }
-.tweet-card-photos { width: 100%; line-height: 0; }
+
+/* Grade de fotos — imita os 4 layouts que o próprio X usa: 1 foto grande,
+   2 lado a lado, 3 (uma grande + duas empilhadas) e 4 em grade 2x2. */
+.tweet-card-photos {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+}
 .tweet-card-photo {
   width: 100%;
-  max-height: 420px;
+  height: 100%;
   object-fit: cover;
   display: block;
 }
-.tweet-card-photos-grid {
+.tweet-card-photos[data-count="1"] { aspect-ratio: 16 / 10; }
+.tweet-card-photos[data-count="2"] {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 2px;
 }
-.tweet-card-photos-grid .tweet-card-photo { max-height: 220px; }
+.tweet-card-photos[data-count="3"] {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 2px;
+}
+.tweet-card-photos[data-count="3"] .tweet-card-photo:first-child { grid-row: 1 / span 2; }
+.tweet-card-photos[data-count="4"] {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 2px;
+}
 .tweet-card-date {
   display: block;
-  padding: 0.7rem 1.1rem 0.85rem;
+  padding: 0.75rem 1.1rem 0.9rem;
   font-size: 0.76rem;
   color: var(--txt3);
 }

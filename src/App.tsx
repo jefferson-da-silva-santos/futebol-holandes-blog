@@ -640,10 +640,12 @@ function TweetEmbed({ url }: { url: string }) {
     return (
       <a className="tweet-card" href={t.url} target="_blank" rel="noopener noreferrer">
         <div className="tweet-card-head">
-          <span className="tweet-card-brand">𝕏</span>
-          {t.authorImage
-            ? <img className="tweet-card-avatar" src={t.authorImage} alt={t.authorName} />
-            : <span className="tweet-card-avatar tweet-card-avatar-placeholder" />}
+          <span className="tweet-card-avatar-wrap">
+            {t.authorImage
+              ? <img className="tweet-card-avatar" src={t.authorImage} alt={t.authorName} />
+              : <span className="tweet-card-avatar tweet-card-avatar-placeholder" />}
+            <span className="tweet-card-brand">𝕏</span>
+          </span>
           <span className="tweet-card-author">
             <span className="tweet-card-name">{t.authorName}</span>
             {t.authorHandle && <span className="tweet-card-handle">@{t.authorHandle}</span>}
@@ -651,7 +653,7 @@ function TweetEmbed({ url }: { url: string }) {
         </div>
         {t.text && <p className="tweet-card-text">{stripTrailingMediaLink(t.text)}</p>}
         {t.photos.length > 0 && (
-          <div className={`tweet-card-photos ${t.photos.length > 1 ? "tweet-card-photos-grid" : ""}`}>
+          <div className="tweet-card-photos" data-count={t.photos.length}>
             {t.photos.map((src, i) => (
               <img key={i} src={src} alt="" className="tweet-card-photo" loading="lazy" />
             ))}
