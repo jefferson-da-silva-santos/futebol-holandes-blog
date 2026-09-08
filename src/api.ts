@@ -1,4 +1,4 @@
-const BASE = "https://api-futebool-holandes-s8bf.vercel.app";
+const BASE = "https://deeppink-chimpanzee-322958.hostingersite.com";
 const TOKEN_KEY = "fh_admin_token";
 
 export const auth = {
