@@ -26,6 +26,9 @@ jobs:
       - name: Instalar dependências
         run: npm ci
 
+      - name: Gerar sitemap.xml com os artigos publicados
+        run: node scripts/generate-sitemap.mjs
+
       - name: Build de produção
         run: npm run build
         env:

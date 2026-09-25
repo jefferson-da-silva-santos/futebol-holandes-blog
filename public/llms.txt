@@ -1,0 +1,23 @@
+# Futebol Holandês
+
+> Portal de notícias em português sobre o futebol da Holanda (Países Baixos): Eredivisie, Seleção Holandesa (Oranje), Nations League, transferências, resultados e classificações.
+
+## Sobre o site
+Futebol Holandês é um site de notícias dedicado a cobrir o futebol neerlandês para o público de língua portuguesa — cobrindo a Eredivisie (primeira divisão), a Seleção Holandesa, competições europeias envolvendo clubes e seleção da Holanda, e o mercado de transferências.
+
+## Conteúdo coberto
+- **Eredivisie**: notícias, classificação, resultados e artilheiros da primeira divisão holandesa.
+- **Seleção Holandesa**: convocações, próximos jogos, resultados e cobertura da Nations League.
+- **Mercado de Transferências**: contratações, negociações e saídas de clubes holandeses.
+- **Clubes**: cobertura de times como Ajax, PSV Eindhoven, Feyenoord, AZ Alkmaar, FC Twente, entre outros da Eredivisie.
+
+## Estrutura do site
+- Home (/): destaques e notícias mais recentes.
+- Eredivisie (/eredivisie): notícias e classificação da liga.
+- Seleção Holandesa (/selecao-holandesa): notícias, convocação e próximos jogos da seleção.
+- Categorias (/categoria/[categoria]): notícias filtradas por assunto.
+- Times (/time/[time]): notícias filtradas por clube.
+- Artigos (/noticia/[slug]): páginas individuais de cada notícia.
+
+## Idioma
+Conteúdo publicado em português (pt-BR), com foco no público brasileiro e lusófono interessado no futebol holandês.

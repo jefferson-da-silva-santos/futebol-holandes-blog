@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://futebolholandes.blog.br/sitemap.xml

@@ -1,3 +1,15 @@
+// ═════════════════════════════════════════════════════════════════════════════
+//  SEO — estratégia de palavras-chave (ver também <meta name="keywords"> e o
+//  JSON-LD em index.html). Usadas naturalmente nos H1/H2 e textos das páginas,
+//  nunca empilhadas — cada H1 abaixo já carrega uma delas.
+//
+//  Principal:    futebol holandês
+//  Secundárias:  eredivisie, seleção holandesa, notícias eredivisie,
+//                transferências eredivisie, classificação eredivisie
+//  Cauda longa:  notícias do futebol holandês em português,
+//                classificação da eredivisie atualizada,
+//                próximos jogos da seleção holandesa
+// ═════════════════════════════════════════════════════════════════════════════
 import { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext, type ReactNode } from "react";
 import { Routes, Route, Link, NavLink, useNavigate, useParams, Outlet } from "react-router-dom";
 import {
@@ -368,8 +380,11 @@ function HomePage() {
   return (
     <div className="layout-grid">
       <main className="main">
+        {/* H1 único da home — oculto visualmente (o design não tem um título
+            grande na home), mas presente no HTML pra Google e leitores de tela. */}
+        <h1 className="sr-only">Futebol Holandês — Notícias da Eredivisie e da Seleção Holandesa</h1>
         <section className="page-section">
-          <div className="sec-head"><span className="sec-label"><i className="bx bxs-star" /> Destaques</span></div>
+          <div className="sec-head"><h2 className="sec-label"><i className="bx bxs-star" /> Destaques</h2></div>
           {highlights.length > 0 ? (
             <div className="hero-grid">
               <HeroCard article={highlights[0]} size="large" onClick={() => openArticle(highlights[0].slug)} />
@@ -385,7 +400,7 @@ function HomePage() {
         </section>
 
         <section className="page-section">
-          <div className="sec-head"><span className="sec-label"><i className="bx bx-news" /> Mais Notícias</span></div>
+          <div className="sec-head"><h2 className="sec-label"><i className="bx bx-news" /> Mais Notícias</h2></div>
           {gridLoading ? (
             <div className="news-grid"><SkCard /><SkCard /><SkCard /></div>
           ) : moreNews.length > 0 ? (
@@ -430,20 +445,20 @@ function EredivisieePage() {
     <div className="layout-grid">
       <main className="main">
         <section className="page-section">
-          <div className="sec-head"><span className="sec-label"><i className="bx bxs-trophy" /> {standing?.title || "Eredivisie"}</span></div>
+          <div className="sec-head"><h1 className="sec-label"><i className="bx bxs-trophy" /> {standing?.title || "Eredivisie"}</h1></div>
           {config.eredivisie_intro && (
             <p className="page-intro" dangerouslySetInnerHTML={{ __html: config.eredivisie_intro.replace(/PSV Eindhoven/g, "<strong>PSV Eindhoven</strong>") }} />
           )}
         </section>
         <section className="page-section">
-          <div className="sec-head"><span className="sec-label"><i className="bx bx-news" /> Notícias</span></div>
+          <div className="sec-head"><h2 className="sec-label"><i className="bx bx-news" /> Notícias</h2></div>
           {news.length > 0
             ? <div className="news-grid">{news.map(n => <ArticleCard key={n.id} article={n} onClick={() => openArticle(n.slug)} />)}</div>
             : <div className="empty-state"><i className="bx bx-news" /><p>Nenhuma notícia da Eredivisie.</p></div>}
         </section>
         {standing && (
           <section className="page-section">
-            <div className="sec-head"><span className="sec-label"><i className="bx bx-bar-chart-alt-2" /> Classificação Final</span></div>
+            <div className="sec-head"><h2 className="sec-label"><i className="bx bx-bar-chart-alt-2" /> Classificação Final</h2></div>
             <div className="table-wrap">
               <table className="full-table">
                 <thead><tr><th>#</th><th className="tl">Time</th><th>J</th><th>V</th><th>E</th><th>D</th><th>SG</th><th>Pts</th></tr></thead>
@@ -497,13 +512,13 @@ function SelecaoPage() {
     <div className="layout-grid">
       <main className="main">
         <section className="page-section">
-          <div className="sec-head"><span className="sec-label"><i className="bx bx-flag" /> Seleção Holandesa</span></div>
+          <div className="sec-head"><h1 className="sec-label"><i className="bx bx-flag" /> Seleção Holandesa</h1></div>
           {news.map(n => <HeroCard key={n.id} article={n} size="large" onClick={() => openArticle(n.slug)} />)}
         </section>
 
         {convocation && convocation.groups.length > 0 && (
           <section className="page-section">
-            <div className="sec-head"><span className="sec-label"><i className="bx bxs-group" /> {convocation.title}</span></div>
+            <div className="sec-head"><h2 className="sec-label"><i className="bx bxs-group" /> {convocation.title}</h2></div>
             <div className="conv-grid">
               {convocation.groups.map(g => (
                 <div key={g.id} className="conv-group">
@@ -517,7 +532,7 @@ function SelecaoPage() {
 
         {fixtures.length > 0 && (
           <section className="page-section">
-            <div className="sec-head"><span className="sec-label"><i className="bx bx-calendar-event" /> Próximos Jogos</span></div>
+            <div className="sec-head"><h2 className="sec-label"><i className="bx bx-calendar-event" /> Próximos Jogos</h2></div>
             <div className="fixtures">
               {fixtures.map(f => (
                 <div key={f.id} className="fixture">
@@ -878,7 +893,7 @@ function ArticlePage() {
         </article>
         {related.length > 0 && (
           <section className="related-section">
-            <div className="sec-head"><span className="sec-label"><i className="bx bx-news" /> Relacionadas</span></div>
+            <div className="sec-head"><h2 className="sec-label"><i className="bx bx-news" /> Relacionadas</h2></div>
             <div className={`news-grid cols-${related.length}`}>
               {related.map(n => <ArticleCard key={n.id} article={n} onClick={() => navigate(`/noticia/${n.slug}`)} />)}
             </div>
@@ -928,9 +943,9 @@ function CategoryPage() {
       <main className="main">
         <section className="page-section">
           <div className="sec-head">
-            <span className="sec-label">
+            <h1 className="sec-label">
               <i className="bx bx-purchase-tag" /> {realName}
-            </span>
+            </h1>
           </div>
           {articles.length > 0 ? (
             <>
@@ -1002,7 +1017,7 @@ function TeamPage() {
     <div className="layout-grid">
       <main className="main">
         <section className="page-section">
-          <div className="sec-head"><span className="sec-label"><i className="bx bx-football" /> {realClub}</span></div>
+          <div className="sec-head"><h1 className="sec-label"><i className="bx bx-football" /> {realClub}</h1></div>
           {articles.length > 0 ? (
             <div className="news-grid">
               {articles.map(n => <ArticleCard key={n.id} article={n} onClick={() => openArticle(n.slug)} />)}

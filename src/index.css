@@ -4694,3 +4694,18 @@ i[class*=" bxs-"] {
   speak: none;
   -webkit-font-smoothing: antialiased;
 }
+/* ═══════════════════════════════════════════════════════════════════════════
+   SEO — utilitário para H1 semântico sem alterar o layout visual (usado nas
+   páginas que não têm um "título grande" no design, como a Home)
+   ═══════════════════════════════════════════════════════════════════════════ */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
