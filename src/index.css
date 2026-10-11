@@ -4716,3 +4716,17 @@ i[class*=" bxs-"] {
 .tweet-embed-official .tweet-embed-skeleton { width: 100%; }
 .tweet-embed-official-slot { width: 100%; display: flex; justify-content: center; }
 .tweet-embed-official-slot .twitter-tweet { margin: 0 auto !important; }
+
+/* Centraliza todos os estados do post do X (carregando, embed oficial e
+   botão de fallback) no meio do texto da matéria — o wrap tem max-width,
+   então precisa de margin auto nas laterais. */
+.art-body .tweet-embed-wrap,
+.art-body .instagram-embed-wrap {
+  margin-left: auto;
+  margin-right: auto;
+}
+.tweet-embed-official-slot iframe,
+.tweet-embed-official-slot .twitter-tweet-rendered {
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
