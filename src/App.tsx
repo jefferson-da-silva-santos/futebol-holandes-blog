@@ -513,7 +513,9 @@ function SelecaoPage() {
       <main className="main">
         <section className="page-section">
           <div className="sec-head"><h1 className="sec-label"><i className="bx bx-flag" /> Seleção Holandesa</h1></div>
-          {news.map(n => <HeroCard key={n.id} article={n} size="large" onClick={() => openArticle(n.slug)} />)}
+          {news.length > 0
+  ? <div className="news-grid">{news.map(n => <ArticleCard key={n.id} article={n} onClick={() => openArticle(n.slug)} />)}</div>
+  : <div className="empty-state"><i className="bx bx-news" /><p>Nenhuma notícia da Seleção Holandesa.</p></div>}
         </section>
 
         {convocation && convocation.groups.length > 0 && (
