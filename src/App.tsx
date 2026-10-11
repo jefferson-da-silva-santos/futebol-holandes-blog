@@ -626,34 +626,147 @@ function stripTrailingMediaLink(text: string): string {
   return text.replace(/\s*https:\/\/t\.co\/\w+\s*$/i, "");
 }
 
+// Extrai o ID numérico do post a partir de qualquer formato de link
+// (x.com, twitter.com, mobile., /statuses/, com ?s=20 etc.).
+function getTweetId(url: string): string | null {
+  const m = url.match(/(?:twitter\.com|x\.com)\/(?:[^/?#]+\/)?status(?:es)?\/(\d+)/i);
+  return m ? m[1] : null;
+}
+
+// Rejeita a promise se ela não resolver dentro de `ms` — evita que o leitor
+// fique preso no esqueleto se o backend ou o X travarem.
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = window.setTimeout(() => reject(new Error("timeout")), ms);
+    p.then(v => { window.clearTimeout(t); resolve(v); },
+           e => { window.clearTimeout(t); reject(e); });
+  });
+}
+
+// Carrega o widgets.js oficial do X uma única vez por página. Ele roda no
+// navegador do leitor, então não depende do backend (que costuma ser
+// bloqueado/limitado pelo X por estar num IP de datacenter).
+let twitterScriptPromise: Promise<any> | null = null;
+function loadTwitterScript(): Promise<any> {
+  const win = window as any;
+  if (win.twttr?.widgets?.createTweet) return Promise.resolve(win.twttr);
+  if (twitterScriptPromise) return twitterScriptPromise;
+  twitterScriptPromise = new Promise((resolve, reject) => {
+    const done = () => {
+      const tw = (window as any).twttr;
+      if (!tw) { reject(new Error("twttr indisponível")); return; }
+      // `ready` garante que a API `widgets` já foi inicializada.
+      if (typeof tw.ready === "function") tw.ready((t: any) => resolve(t));
+      else if (tw.widgets?.createTweet) resolve(tw);
+      else reject(new Error("twttr.widgets indisponível"));
+    };
+    const id = "twitter-wjs";
+    let s = document.getElementById(id) as HTMLScriptElement | null;
+    if (s) {
+      if ((window as any).twttr) done();
+      else s.addEventListener("load", done, { once: true });
+      return;
+    }
+    s = document.createElement("script");
+    s.id = id;
+    s.src = "https://platform.twitter.com/widgets.js";
+    s.async = true;
+    s.charset = "utf-8";
+    s.onload = done;
+    s.onerror = () => reject(new Error("falha ao carregar widgets.js"));
+    document.body.appendChild(s);
+  }).catch(err => {
+    // Libera nova tentativa numa próxima matéria (ex.: rede instável).
+    twitterScriptPromise = null;
+    document.getElementById("twitter-wjs")?.remove();
+    throw err;
+  });
+  return twitterScriptPromise;
+}
+
+// Ordem de tentativas:
+//   1. Cartão próprio a partir do backend (/oembed/twitter-full) — timeout 6s
+//   2. Embed oficial do X via widgets.js, direto no navegador — timeout 10s
+//   3. Botão "Ver publicação no X" (só se as duas falharem)
+type TweetState =
+  | { status: "loading" }
+  | { status: "ready"; tweet: TweetFull }
+  | { status: "widget" }
+  | { status: "error" };
+
 function TweetEmbed({ url }: { url: string }) {
-  const [state, setState] = useState<
-    { status: "loading" } | { status: "ready"; tweet: TweetFull } | { status: "error" }
-  >(() => {
+  const tweetId = getTweetId(url);
+  const widgetRef = useRef<HTMLDivElement>(null);
+  const [widgetLoaded, setWidgetLoaded] = useState(false);
+  const [state, setState] = useState<TweetState>(() => {
     const cached = tweetFullCache.get(url);
     return cached ? { status: "ready", tweet: cached } : { status: "loading" };
   });
 
+  // Passo 1 — backend
   useEffect(() => {
-    if (tweetFullCache.has(url)) return;
+    if (tweetFullCache.has(url)) { setState({ status: "ready", tweet: tweetFullCache.get(url)! }); return; }
     let cancelled = false;
     setState({ status: "loading" });
-    oembedApi.twitterFull(url)
+    setWidgetLoaded(false);
+    withTimeout(oembedApi.twitterFull(url), 6000)
       .then(tweet => {
+        // Resposta "vazia" (sem autor e sem texto) também conta como falha.
+        if (!tweet || (!tweet.text && !tweet.authorName)) throw new Error("tweet vazio");
         tweetFullCache.set(url, tweet);
         if (!cancelled) setState({ status: "ready", tweet });
       })
-      .catch(() => {
-        if (!cancelled) setState({ status: "error" });
+      .catch(err => {
+        if (cancelled) return;
+        console.warn("[TweetEmbed] backend falhou, usando embed oficial do X:", err);
+        setState(tweetId ? { status: "widget" } : { status: "error" });
       });
     return () => { cancelled = true; };
-  }, [url]);
+  }, [url, tweetId]);
+
+  // Passo 2 — widgets.js oficial
+  useEffect(() => {
+    if (state.status !== "widget" || !tweetId) return;
+    const el = widgetRef.current;
+    if (!el) return;
+    let cancelled = false;
+    el.innerHTML = "";
+    withTimeout(
+      loadTwitterScript().then(tw =>
+        tw.widgets.createTweet(tweetId, el, { lang: "pt", dnt: true, align: "center" })
+      ),
+      10000
+    )
+      .then((node: HTMLElement | undefined) => {
+        if (cancelled) { node?.remove(); return; }
+        // createTweet resolve `undefined` quando o post foi apagado/é privado.
+        if (!node) throw new Error("post indisponível");
+        setWidgetLoaded(true);
+      })
+      .catch(err => {
+        if (cancelled) return;
+        console.warn("[TweetEmbed] embed oficial do X falhou:", err);
+        el.innerHTML = "";
+        setState({ status: "error" });
+      });
+    return () => { cancelled = true; el.innerHTML = ""; };
+  }, [state.status, tweetId]);
+
+  const skeleton = (
+    <div className="tweet-embed-skeleton">
+      <div className="tweet-skeleton-avatar" />
+      <div className="tweet-skeleton-lines">
+        <div className="tweet-skeleton-line" />
+        <div className="tweet-skeleton-line short" />
+      </div>
+    </div>
+  );
 
   if (state.status === "ready") {
     const t = state.tweet;
     const dateLabel = formatTweetDate(t.createdAt);
     return (
-      <a className="tweet-card" href={t.url} target="_blank" rel="noopener noreferrer">
+      <a className="tweet-card" href={t.url || url} target="_blank" rel="noopener noreferrer">
         <div className="tweet-card-head">
           <span className="tweet-card-avatar-wrap">
             {t.authorImage
@@ -667,7 +780,7 @@ function TweetEmbed({ url }: { url: string }) {
           </span>
         </div>
         {t.text && <p className="tweet-card-text">{stripTrailingMediaLink(t.text)}</p>}
-        {t.photos.length > 0 && (
+        {t.photos?.length > 0 && (
           <div className="tweet-card-photos" data-count={t.photos.length}>
             {t.photos.map((src, i) => (
               <img key={i} src={src} alt="" className="tweet-card-photo" loading="lazy" />
@@ -676,6 +789,15 @@ function TweetEmbed({ url }: { url: string }) {
         )}
         {dateLabel && <span className="tweet-card-date">{dateLabel}</span>}
       </a>
+    );
+  }
+  if (state.status === "widget") {
+    return (
+      <div className="tweet-embed-wrap tweet-embed-official">
+        {!widgetLoaded && skeleton}
+        {/* O X injeta o iframe do post aqui dentro; o React não mexe nesse nó. */}
+        <div ref={widgetRef} className="tweet-embed-official-slot" />
+      </div>
     );
   }
   if (state.status === "error") {
@@ -690,17 +812,7 @@ function TweetEmbed({ url }: { url: string }) {
       </div>
     );
   }
-  return (
-    <div className="tweet-embed-wrap">
-      <div className="tweet-embed-skeleton">
-        <div className="tweet-skeleton-avatar" />
-        <div className="tweet-skeleton-lines">
-          <div className="tweet-skeleton-line" />
-          <div className="tweet-skeleton-line short" />
-        </div>
-      </div>
-    </div>
-  );
+  return <div className="tweet-embed-wrap">{skeleton}</div>;
 }
 
 // Carrega o embed.js do Instagram uma única vez por página.

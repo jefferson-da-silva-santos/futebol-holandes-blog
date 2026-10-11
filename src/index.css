@@ -4709,3 +4709,10 @@ i[class*=" bxs-"] {
   white-space: nowrap;
   border: 0;
 }
+
+/* Embed oficial do X (widgets.js) — usado quando o backend não consegue
+   buscar o post. O iframe é injetado dentro de .tweet-embed-official-slot. */
+.tweet-embed-official { flex-direction: column; align-items: center; }
+.tweet-embed-official .tweet-embed-skeleton { width: 100%; }
+.tweet-embed-official-slot { width: 100%; display: flex; justify-content: center; }
+.tweet-embed-official-slot .twitter-tweet { margin: 0 auto !important; }
