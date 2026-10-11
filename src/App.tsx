@@ -1176,6 +1176,43 @@ function Layout() {
 
   function closeMenus() { setMenuOpen(false); setOpenDropdownId(null); }
 
+  // ── Menu responsivo ──────────────────────────────────────────────────────
+  // O menu tem muitos itens longos ("COMPETIÇÕES INTERNACIONAIS" etc.) com
+  // white-space: nowrap. Antes, entre 769px e ~1400px eles não cabiam e
+  // empurravam a página para os lados, criando scroll horizontal. Agora
+  // medimos a largura real dos itens e, se não couberem, trocamos para o
+  // botão hambúrguer — funciona mesmo que o cliente adicione novos itens.
+  const navInnerRef = useRef<HTMLDivElement>(null);
+  const navLinksRef = useRef<HTMLDivElement>(null);
+  const [compactNav, setCompactNav] = useState(false);
+
+  useEffect(() => {
+    const inner = navInnerRef.current;
+    const links = navLinksRef.current;
+    if (!inner || !links) return;
+
+    function measure() {
+      if (!inner || !links) return;
+      // No mobile (≤768px) o CSS já esconde os links: sempre compacto.
+      if (getComputedStyle(links).display === "none") { setCompactNav(true); return; }
+      const needed = Array.from(links.children).reduce((sum, el) => sum + (el as HTMLElement).offsetWidth, 0);
+      const cs = getComputedStyle(inner);
+      const available = inner.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      setCompactNav(needed > available);
+    }
+
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(inner);
+    window.addEventListener("resize", measure);
+    // Reajusta quando as fontes terminam de carregar (mudam a largura do texto).
+    (document as any).fonts?.ready?.then(measure);
+    return () => { ro.disconnect(); window.removeEventListener("resize", measure); };
+  }, [menu]);
+
+  // Ao voltar para o modo desktop, fecha o drawer mobile.
+  useEffect(() => { if (!compactNav) setMenuOpen(false); }, [compactNav]);
+
   return (
     <div className="app">
       <div className="topbar">
@@ -1196,9 +1233,9 @@ function Layout() {
         </div>
       </div>
 
-      <nav className="navbar" ref={navRef}>
-        <div className="nav-inner">
-          <div className="nav-links">
+      <nav className={`navbar${compactNav ? " nav-compact" : ""}`} ref={navRef}>
+        <div className="nav-inner" ref={navInnerRef}>
+          <div className="nav-links" ref={navLinksRef} aria-hidden={compactNav || undefined}>
             {menu.map(item => {
               const hasChildren = item.children && item.children.length > 0;
 

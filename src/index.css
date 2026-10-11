@@ -4730,3 +4730,51 @@ i[class*=" bxs-"] {
   margin-left: auto !important;
   margin-right: auto !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SEM SCROLL HORIZONTAL
+   1) Menu compacto: quando os itens não cabem na largura (classe adicionada
+      pelo Layout em App.tsx), os links ficam invisíveis com largura zero —
+      continuam medíveis, mas não ocupam espaço — e o hambúrguer aparece.
+   2) Dropdowns dos últimos itens abrem alinhados à direita, para não
+      passarem da borda da tela.
+   3) Rede de segurança: nada consegue alargar a página. `clip` (e não
+      `hidden`) para não quebrar o position: sticky da navbar.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.navbar.nav-compact .nav-links {
+  flex: 0 0 0;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+.navbar.nav-compact .hamburger {
+  display: flex;
+}
+.navbar.nav-compact .nav-inner {
+  justify-content: flex-end;
+  min-height: 48px;
+}
+.nav-links > .nav-dropdown:nth-last-child(-n + 2) .dropdown {
+  left: auto;
+  right: 0;
+}
+.dropdown {
+  max-width: calc(100vw - 2rem);
+  max-height: calc(100vh - 140px);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+html,
+body {
+  max-width: 100%;
+  overflow-x: clip;
+}
+/* Itens do menu um pouco mais compactos: com o tamanho antigo, os 8 itens
+   somavam ~1336px e não cabiam nem no container de 1280px (era a principal
+   causa do scroll lateral). Assim o menu completo cabe em telas a partir de
+   ~1170px; abaixo disso entra o hambúrguer. */
+.nav-inner { padding: 0 1rem; }
+.nav-btn { padding: 0 0.65rem; font-size: 0.72rem; letter-spacing: 0.03em; gap: 0.3rem; }
+.nav-btn i { font-size: 0.9rem; }

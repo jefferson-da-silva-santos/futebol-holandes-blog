@@ -1217,6 +1217,13 @@ function CategoriesSection({ articles, categories, setCategories }: {
 
   async function handleCreate() {
     if (!newName.trim()) { showNotyf("error", "Nome obrigatório."); return; }
+    // Evita duplicatas: "Seleção Holandesa Feminina" e "Seleção Holandesa - Feminina"
+    // geram o mesmo link (slug). Antes, o backend criava uma 2ª categoria com um
+    // número no final do link, e o item do menu continuava apontando pra 1ª (vazia).
+    const toSlug = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    const existing = categories.find(c => c.slug.replace(/-\d{10,}$/, "") === toSlug(newName));
+    if (existing) { showNotyf("error", `Já existe a categoria "${existing.name}". Use ela em vez de criar outra.`); return; }
     setSaving(true);
     try { const c = await categoriesApi.create(newName.trim(), "badge-orange", newColor); setCategories(p => [...p, c]); setNewName(""); setNewColor("#FF6200"); showNotyf("success", `Categoria "${c.name}" criada!`); }
     catch (err: any) { showNotyf("error", err.message); }
